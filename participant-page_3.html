@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flat⇄Form · Participant</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --ink:#1a1a1a; --ink-faint:#8a8a85; --line:#e2e0da; --bg:#f5f4f0; --card:#fff;
+    --blue:#2288ff; --green:#1a7f37; --amber:#b8860b; --physical:#f2d9d9; --physical-ink:#a33;
+    --pretest:#e8d9c3; --s1:#cfe3d8; --s2:#cfe0f0; --s3:#e6d6ef; --posttest:#e8d9c3;
+  }
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);height:100vh;line-height:1.5;}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px;}
+  .brand{font-weight:800;font-size:15px;letter-spacing:.02em;color:var(--ink-faint);text-transform:uppercase;margin-bottom:6px;}
+  h1{font-size:28px;font-weight:800;margin-bottom:6px;}
+  h2{font-size:20px;font-weight:700;margin-bottom:4px;}
+  p.sub{color:var(--ink-faint);font-size:14px;margin-bottom:20px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .btn:hover{border-color:#bbb;}
+  .btn.blue{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btn.green{background:var(--green);border-color:var(--green);color:#fff;}
+  .btn.ghost{background:none;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn.block{width:100%;justify-content:center;}
+  .row{display:flex;align-items:center;gap:10px;}
+  .spacer{flex:1;}
+  .faint{color:var(--ink-faint);}
+  .mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;}
+  input[type=file]{font-size:13px;}
+  textarea,input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fdfdfb;}
+  textarea{min-height:90px;resize:vertical;}
+  .stage-list{display:flex;flex-direction:column;gap:10px;}
+  .stage-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#fff;}
+  .stage-row.done{background:#f3f8f4;border-color:#cfe3d8;}
+  .stage-row.current{border-color:var(--blue);box-shadow:0 0 0 2px rgba(34,136,255,.15);}
+  .stage-row.locked{opacity:.5;}
+  .stagenum{width:34px;height:34px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;}
+  .stage-row.done .stagenum{background:var(--green);color:#fff;}
+  .stage-row.current .stagenum{background:var(--blue);color:#fff;}
+  .scaffold-imgs{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;}
+  .scaffold-imgs figure{text-align:center;}
+  .scaffold-imgs img{height:140px;max-width:220px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fafaf8;}
+  .scaffold-imgs figcaption{font-size:11px;color:var(--ink-faint);margin-top:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .qgroup{border-top:1px solid var(--line);padding-top:16px;margin-top:16px;}
+  .qgroup:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .qtitle{font-weight:600;font-size:14px;margin-bottom:8px;}
+  .likert{display:flex;align-items:center;gap:10px;margin-top:6px;}
+  .likert .end{font-size:11px;color:var(--ink-faint);width:80px;}
+  .likert .opts{display:flex;gap:14px;flex:1;justify-content:center;}
+  .likert label{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--ink-faint);cursor:pointer;}
+  .optlist{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .optlist label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px 10px;border:1px solid var(--line);border-radius:8px;}
+  .optlist label:has(input:checked){border-color:var(--blue);background:#eef6ff;}
+  .refq{font-size:13px;padding:6px 0;color:#333;}
+  .refq b{color:var(--ink-faint);font-weight:600;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;}
+  .badge.pretest,.badge.posttest{background:var(--pretest);}
+  .badge.s1{background:var(--s1);} .badge.s2{background:var(--s2);} .badge.s3{background:var(--s3);}
+  .trail{display:flex;align-items:center;gap:0;margin-bottom:14px;}
+  .trail.compact{margin-bottom:0;}
+  .trail-node{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .trail-circle{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;background:var(--bg);color:var(--ink-faint);border:1px solid var(--line);}
+  .trail-circle.done{background:var(--green);color:#fff;border-color:var(--green);}
+  .trail-circle.current.pretest,.trail-circle.current.posttest{background:var(--pretest);border-color:var(--pretest);color:var(--ink);}
+  .trail-circle.current.s1{background:var(--s1);border-color:var(--s1);color:var(--ink);}
+  .trail-circle.current.s2{background:var(--s2);border-color:var(--s2);color:var(--ink);}
+  .trail-circle.current.s3{background:var(--s3);border-color:var(--s3);color:var(--ink);}
+  .trail.compact .trail-circle{width:20px;height:20px;font-size:10px;}
+  .trail-node-label{font-size:10px;color:var(--ink-faint);white-space:nowrap;}
+  .trail-node-label.on{color:var(--ink);font-weight:700;}
+  .trail-connector{flex:1;height:1px;background:var(--line);margin:0 4px;align-self:center;transform:translateY(-9px);}
+  .trail.compact .trail-connector{transform:translateY(-6px);margin:0 3px;}
+  .microstep{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-faint);margin-bottom:16px;}
+  .microstep .on{color:var(--ink);font-weight:700;}
+  .microstep .sep{color:var(--line);}
+  .screen{animation:screenFade .22s ease;}
+  @keyframes screenFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  .dropzone{border:1.5px dashed #ccc;border-radius:12px;padding:40px 20px;text-align:center;color:var(--ink-faint);cursor:pointer;}
+  .dropzone:hover{border-color:var(--blue);color:var(--blue);}
+  .filelist{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+  .filerow{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 10px;background:var(--bg);border-radius:8px;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+  .stepnote{background:#fffbe8;border:1px solid #f0e4a0;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px;}
+  #ps-container{display:none;position:fixed;inset:0;z-index:500;background:#fff;flex-direction:column;}
+  #ps-topbar{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var(--bg);border-bottom:1px solid var(--line);flex-shrink:0;}
+  #ps-iframe{flex:1;width:100%;border:none;}
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+
+<!-- Panel Studio, embedded in-page — this container is never touched by
+     render()'s innerHTML replacement, so the iframe stays alive (and its
+     work-in-progress intact) across every other interaction on the page.
+     Visibility is toggled directly, not re-rendered. -->
+<div id="ps-container">
+  <div id="ps-topbar">
+    <div id="ps-topbar-trail" class="row" style="flex:1"></div>
+    <button class="btn ghost sm" onclick="saveFromActivity()">💾 Save</button>
+    <button class="btn ghost sm" onclick="backToTask()">Done — continue</button>
+  </div>
+  <iframe id="ps-iframe"></iframe>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════
+//  DATA: survey / prompt / interview question banks — mirrors the
+//  Workshop Console's definitions so this page can stand completely alone.
+// ════════════════════════════════════════
+const L_EASE=['Very easy','Very hard'], L_DIFF=['Not at all','Very much'];
+const SURVEYDEF = {
+  pretest:{title:'Reflection — pre-test',sub:'Tell us how you experienced the test.',qs:[
+    {t:'likert',q:'How easy was it to complete this test?',ends:L_EASE},
+    {t:'open',q:'What were the main challenges you faced?'},
+    {t:'single',q:'How confident are you to attempt such a task?',opts:['Not at all','Slightly','Moderately','Very','Extremely']},
+    {t:'likert',q:'Was it easy to visualise the garment from its image?',ends:L_EASE},
+    {t:'likert',q:'Was it easy to identify the panels correctly?',ends:L_EASE},
+    {t:'likert',q:'Was it easy to identify the shapes of the panels?',ends:L_EASE},
+    {t:'multi',q:'Which shapes were difficult to judge? (select all that apply)',opts:['Bodice','Sleeve','Collar','Skirt panel','Yoke','Pocket','Dart']},
+    {t:'single',q:'Is it necessary to visualise the garment to decide the panel shape?',opts:['Yes, always','Sometimes','No']},
+    {t:'single',q:'Can you decide whether a panel is correct for the chosen garment?',opts:['Yes, confidently','Yes, with effort','Not sure','No']},
+    {t:'open',q:'Anything else about how you approached this test?'},
+  ]},
+  s1:{title:'Survey — Stage 1 · Identify the panels',sub:'About selecting and arranging panels.',qs:[
+    {t:'single',q:'How did you determine which panel is most suitable?',opts:['By matching the garment shape','By prior knowledge of panels','By trial and elimination','Mostly by guessing']},
+    {t:'likert',q:'How easy was it to decide where to place each panel?',ends:L_EASE},
+    {t:'single',q:'Did you imagine folds while placing/creating panels?',opts:['Yes, clearly','Somewhat','No']},
+    {t:'single',q:'Did you imagine darts while placing/creating panels?',opts:['Yes, clearly','Somewhat','No']},
+    {t:'multi',q:'Which did you consider when deciding a new panel? (select all)',opts:['Functionality','Aesthetics','Gatherings','Piping','Seam allowance']},
+    {t:'likert',q:'How difficult was the panel arrangement?',ends:L_DIFF},
+    {t:'open',q:'What made any arrangement difficult to follow?'},
+    {t:'open',q:'How did you verify your arrangement was correct?'},
+  ]},
+  s2:{title:'Survey — Stage 2 · Construct the garment',sub:'About constructing from the given panels.',qs:[
+    {t:'single',q:'How did you start thinking about the construction?',opts:['Visualised the whole garment first','Started from one key panel','Followed a known sequence','Trial and error']},
+    {t:'single',q:'Which panel did you start with?',opts:['Front bodice','Back','Sleeve','Other']},
+    {t:'single',q:'After seeing the panels, did you modify them before constructing?',opts:['Yes, major changes','Yes, minor changes','No changes']},
+    {t:'likert',q:'How easy was it to construct from the panel image?',ends:L_EASE},
+    {t:'single',q:'Did the garment-image scaffold help you visualise the build?',opts:['Yes, a lot','Somewhat','Not really']},
+    {t:'open',q:'What struggles did you face while constructing the garment?'},
+    {t:'open',q:'What skills would help you do this better next time?'},
+  ]},
+  s3:{title:'Survey — Stage 3 · Style-line panel',sub:'About developing a panel around the style line.',qs:[
+    {t:'likert',q:'How easy was it to read the style line on the garment?',ends:L_EASE},
+    {t:'single',q:'What was your strategy to develop the panel around the line?',opts:['Spread from a central point','Follow the seams/darts','Slash and spread','Trial flattening']},
+    {t:'likert',q:'How challenging was developing the single-panel shape?',ends:L_DIFF},
+    {t:'single',q:'Did the panel need further change after first developing it?',opts:['Yes, major','Yes, minor','No']},
+    {t:'likert',q:'How challenging was confirming the panel fits the style line?',ends:L_DIFF},
+    {t:'open',q:'What did you learn by developing a panel from the style line?'},
+    {t:'open',q:'What complexities did you face, and how did you tackle them?'},
+  ]},
+};
+SURVEYDEF.posttest = Object.assign({},SURVEYDEF.pretest,{title:'Reflection — post-test',sub:'Tell us how you experienced the closing test.'});
+
+const PROMPTDEF = {
+  s1:{title:'Think-aloud · Stage 1',groups:[
+    {h:'Selection of panels',qs:['How many panels did you observe the garment is having?','What different types of panels are required to construct the garment?','What features in each of these panels help you identify its type?','What is the purpose of an on-fold panel?']},
+    {h:'Creation of new panels',qs:['Will you reflect an existing panel shape to create a new panel?','Will you consider surrounding edges to decide the new panel\'s edges?','Will you modify the sleeve panel based on its joining position with the top panels?','Will you modify the panel to incorporate the folds and gatherings?']},
+    {h:'Arrangement of panels',qs:['Are there any conventions to follow to arrange the panels?','What logic do you follow when the arrangement differs from the conventional shape?','Where do you position sleeve cuffs, yoke panels, pockets, lapels, loops, etc.?']},
+    {h:'Evaluation of arrangement',qs:['Do we have a method to confirm whether the arrangement is working?','How do we verify whether any panels are missing?','How do we verify the arrangement is the correct one?']},
+  ]},
+  s2:{title:'Think-aloud · Stage 2',groups:[
+    {h:'',qs:['What is the task given to you?','What imagery did you get when you got this task?','Describe the type of panels you see in front of you.','What imagery did you get when you were given these panels?','How are you planning to construct the garment?','Which panel are you going to start the construction with?','What materials do you need to construct, and why those materials?']},
+  ]},
+  s3:{title:'Think-aloud · Stage 3',groups:[
+    {h:'',qs:['What is the task given to you?','What imagery did you get when you got this task?','Can you visualise how the drawn line would appear on the garment?','Can you visualise cutting along the drawn line to create a separated garment form?','What is your strategy to find the shape of the 2D panel from the 3D form?','How are you planning to flatten out the 3D form?','Where will you cut to spread the 3D form?','What is your thinking process while cutting the 3D form to a flat panel?','How do you decide whether the 2D panel needs further change?','What is your idea of creating a good working 2D panel by spreading the 3D form?','How are you planning to trace the shape as a flat 2D panel?','How will you attach the flat 2D panel back to the 3D garment where it was removed?','Where will you start attaching?','What complexities do you face while attaching the 2D panel to the garment?','How will you tackle these complexities?']},
+  ]},
+};
+const INTERVIEWDEF = {
+  s1:{title:'Interview · Stage 1',groups:[
+    {h:'Overall process',qs:['Describe the process you followed to complete the workshop.','Did you make any guesses due to lack of information — what were they?']},
+    {h:'Garment assignment',qs:['Did the system assigning the garment help participants, or not?']},
+    {h:'Panel selection & creation',qs:['Were the available panels comprehensive enough to modify and create panels for your task?','Was it easy to modify and create new panels?','Was it challenging to identify the shape of the panels — which were easy and which more challenging?']},
+    {h:'Panel arrangement',qs:['Once shapes were identified, how did you decide each position in the arrangement?','What challenges did you face in the arrangement of panels?']},
+    {h:'Self-evaluation',qs:['How did you verify whether your arrangement is correct?','How did you verify you had no other panels left to create?','How did you ensure the arrangement also eases construction?']},
+  ]},
+  s2:{title:'Interview · Stage 2',groups:[
+    {h:'',qs:['Can you explain what you understood when the task was given to you?','What challenges did you face when thinking about completing the task?','How did you verify whether the given panels were all suitable?','Did you face difficulties with the panels given?','Explain your process of construction.','What did you imagine doing when the panels were given to you?','What imagery did you get when you were given these panels?','Did you notice changes between how you visualised earlier and later? Explain.','Was what you made at the end the same as what you first imagined? If different, how — and what created the change?','When you were confused, how did you resolve it — what was your strategy?']},
+  ]},
+  s3:{title:'Interview · Stage 3',groups:[
+    {h:'',qs:['Can you explain what you understood when the task was given to you?','What is the significance of this task in fashion design?','What challenges did you face to understand the task?','What is the first challenge given in this task?','How did you manage to complete the task?','What was your learning?','What was the second task, after cutting the 3D garment?','What challenges did you face while doing it?','What did you learn by doing this task?','What was the third task, after flattening the garment?','What challenges did you face while doing it?','What is your learning?','What was the last task given to you?','What were the challenges?','What is your learning while doing the task?','What is the benefit of this workshop for a fashion designer?']},
+  ]},
+};
+const STAGE_ORDER=['pretest','s1','s2','s3','posttest'];
+const STAGE_NAME={pretest:'Pre-test',s1:'Stage 1 · Identify the panels',s2:'Stage 2 · Construct the garment',s3:'Stage 3 · Style-line panel',posttest:'Post-test'};
+const STAGE_BRIEF={
+  pretest:'Design the panels for the given garment on your own, using the basic panel set — this establishes your baseline before the workshop.',
+  s1:'You are given a garment and a set of panels. Select the right panels for it and arrange them in a construction-ready layout.',
+  s2:'You are given a panel arrangement and a garment image as scaffolding. Construct the garment from the panels — physically or in Clo3D.',
+  s3:'You are given a garment with a marked style-line area. Work out the corresponding 2D panel shape and consolidate it into a single shape.',
+  posttest:'Design the panels for the given garment on your own, one more time — this shows how your approach has changed since pre-test.',
+};
+const STAGE_VERB={
+  pretest:'Start the design task', s1:'Start arranging the panels',
+  s2:'Start constructing', s3:'Start developing the panel',
+  posttest:'Start the design task',
+};
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+let PKG = null;          // the imported/loaded participant package
+let VIEW_STAGE = null;   // which stage is currently open in the UI
+let currentPkgFileHandle = null, currentPkgFileName = null;
+let psLoadedForStage = null;  // which stage's task is currently loaded into the embedded Panel Studio
+let psHandoffTimer = null;    // retry timer while waiting for Panel Studio to ack
+let psUrlMissingWarned = false; // avoid repeating the "set up Panel Studio" toast on every render
+let currentSessionId = null;
+
+function getPanelStudioURL(){ return localStorage.getItem('flatform_panel_studio_url') || ''; }
+function setPanelStudioURL(url){ localStorage.setItem('flatform_panel_studio_url', url||''); }
+
+function newId(prefix){
+  if(window.crypto && typeof crypto.randomUUID === 'function') return prefix+'_'+crypto.randomUUID();
+  return prefix+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+}
+function startSession(){
+  if(!PKG) return;
+  if(!PKG.sessions) PKG.sessions = [];
+  PKG.sessions.forEach(s=>{ if(!s.endedAt){ s.endedAt = new Date().toISOString(); s.endedReason = 'replaced'; } });
+  const id = newId('sess');
+  PKG.sessions.push({id, startedAt:new Date().toISOString(), endedAt:null, endedReason:null});
+  currentSessionId = id;
+}
+function endCurrentSession(reason){
+  if(!PKG || !currentSessionId) return;
+  const s = PKG.sessions.find(s=>s.id===currentSessionId);
+  if(s && !s.endedAt){ s.endedAt = new Date().toISOString(); s.endedReason = reason; }
+}
+
+// ── In-page handoff with Panel Studio, embedded via <iframe> — same tab,
+// same page, no popup. The iframe stays mounted across screen switches so
+// leaving the Activity screen and coming back doesn't lose their work. ──
+window.addEventListener('message', function(e){
+  const data = e.data;
+  if(!data || typeof data !== 'object') return;
+  if(data.type === 'flatform_task_ack'){
+    if(psHandoffTimer){ clearInterval(psHandoffTimer); psHandoffTimer=null; }
+    toast('Panel Studio is ready');
+    const stageKey = psLoadedForStage;
+    const draft = stageKey && PKG && PKG.stages[stageKey] && PKG.stages[stageKey].activityDraft;
+    if(draft){
+      try{ e.source.postMessage({type:'flatform_state_restore', project:draft}, '*'); logSync('restore_sent', stageKey); }
+      catch(err){ logSync('restore_error', stageKey); }
+    }
+  } else if(data.type === 'flatform_results_transfer'){
+    const stageKey = data.stage;
+    if(!stageKey || !PKG || !PKG.stages[stageKey]) return;
+    const st = PKG.stages[stageKey];
+    if(!st.response) st.response=emptyResponse();
+    st.response.uploads = st.response.uploads||[];
+    const json = JSON.stringify(data.project);
+    st.response.uploads.push({
+      name: 'panel-studio-work-'+stageKey+'-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.json',
+      type: 'application/json', size: json.length,
+      dataUrl: 'data:application/json;base64,'+btoa(unescape(encodeURIComponent(json))),
+      at: new Date().toISOString(), fromPanelStudio: true,
+    });
+    toast('Your Panel Studio work for '+STAGE_NAME[stageKey]+' was received automatically');
+    if(VIEW_STAGE===stageKey) render();
+  }
+});
+
+function openInPanelStudio(stageKey){
+  const url = getPanelStudioURL();
+  if(!url){ promptPanelStudioURL(); if(!getPanelStudioURL()) return; }
+  const st = PKG.stages[stageKey];
+  if(!st || !st.assigned){ alert('This stage has not been assigned by your researcher yet.'); return; }
+  PKG.progress.currentScreen = 'activity';
+  render();
+}
+function loadTaskIntoPanelStudio(stageKey){
+  const st = PKG.stages[stageKey];
+  if(!st || !st.assigned) return;
+  const url = getPanelStudioURL();
+  if(!url) return;
+  const iframe = document.getElementById('ps-iframe');
+  if(!iframe || psLoadedForStage === stageKey){ return; } // already loaded — just switched screens, no reload needed
+  const g = st.garment || {};
+  const task = {
+    flatform_task: true, stage: stageKey,
+    garment: { name:g.name, type:g.type, image:g.fullImg||'', frontBackImage:g.frontBackImg||'', flatSketchImage:g.flatSketchImg||'', groupPanelImage:g.arrangementScaffold||'' },
+    complexity: {s:'Simple',m:'Moderate',c:'Complex'}[st.cx]||st.cx,
+    styleLine: st.styleLine || null,
+    panels: (st.tray||[]).map(item=>({ image:item.img||null, shape:item.shape||null, label:item.label })),
+  };
+  psLoadedForStage = stageKey;
+  iframe.src = url;
+  if(psHandoffTimer) clearInterval(psHandoffTimer);
+  let attempts=0;
+  psHandoffTimer = setInterval(()=>{
+    attempts++;
+    if(attempts>30){
+      clearInterval(psHandoffTimer); psHandoffTimer=null;
+      toast('Having trouble connecting to Panel Studio — check its address is correct');
+      return;
+    }
+    try{ iframe.contentWindow.postMessage({type:'flatform_task_transfer', task}, '*'); }catch(err){}
+  }, 400);
+}
+function promptPanelStudioURL(){
+  const cur = getPanelStudioURL();
+  const url = prompt('Enter the web address (URL) of Panel Studio — this is remembered on this machine so you only need to set it once:', cur||'https://');
+  if(url!==null) setPanelStudioURL(url.trim());
+}
+
+function logSync(type, stageKey){
+  if(!PKG) return;
+  if(!PKG.syncLog) PKG.syncLog=[];
+  PKG.syncLog.push({t:new Date().toISOString(), stage:stageKey||null, screen:'activity', type});
+}
+let snapshotInFlight = null;
+function snapshotActivity(stageKey){
+  if(snapshotInFlight) return snapshotInFlight;
+  snapshotInFlight = new Promise(resolve=>{
+    const iframe = document.getElementById('ps-iframe');
+    if(!iframe || psLoadedForStage !== stageKey){ resolve(false); return; }
+    let done=false, timer;
+    const handler = function(e){
+      if(e.data && e.data.type==='flatform_state_snapshot'){
+        done=true;
+        window.removeEventListener('message', handler);
+        clearTimeout(timer);
+        PKG.stages[stageKey].activityDraft = e.data.project;
+        logSync('snapshot_applied', stageKey);
+        resolve(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    try{
+      iframe.contentWindow.postMessage({type:'flatform_state_request'}, '*');
+      logSync('snapshot_requested', stageKey);
+    }catch(err){
+      window.removeEventListener('message', handler);
+      logSync('snapshot_error', stageKey);
+      resolve(false);
+      return;
+    }
+    timer = setTimeout(()=>{
+      if(!done){ window.removeEventListener('message', handler); logSync('snapshot_timeout', stageKey); resolve(false); }
+    }, 1500);
+  }).finally(()=>{ snapshotInFlight = null; });
+  return snapshotInFlight;
+}
+async function saveFromActivity(){
+  if(VIEW_STAGE) await snapshotActivity(VIEW_STAGE);
+  await saveProgress();
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden' && PKG && PKG.progress.currentScreen==='activity' && VIEW_STAGE){
+    snapshotActivity(VIEW_STAGE); // best-effort — page may be backgrounded/closed before this resolves
+  }
+});
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(()=>t.classList.remove('show'),2600); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function readFileAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error||new Error('File could not be read')); r.readAsDataURL(file); }); }
+
+// ════════════════════════════════════════
+//  IMPORT / OPEN a package (or a checkpoint — same format)
+// ════════════════════════════════════════
+function emptyResponse(){
+  return {survey:null,promptNotes:'',interviewNotes:'',uploads:[],submittedAt:null};
+}
+function migratePackage(pkg){
+  if(!pkg.progress) pkg.progress = {currentStage:'pretest', completedStages:[]};
+  if(!pkg.schemaVersion) pkg.schemaVersion = 1;
+  if(pkg.schemaVersion < 2){
+    if(!pkg.sessions) pkg.sessions = [];
+    if(!pkg.eventLog) pkg.eventLog = [];
+    if(!pkg.syncLog) pkg.syncLog = [];
+    if(!pkg.consent) pkg.consent = {recording:'no', interactionLogging:false};
+    if(!pkg.progress.currentScreen) pkg.progress.currentScreen = 'brief';
+    Object.keys(pkg.stages||{}).forEach(function(k){
+      const st = pkg.stages[k];
+      if(!st.activityDraft) st.activityDraft = null;
+      if(st.response && st.response.submittedAt === undefined) st.response.submittedAt = null;
+    });
+    pkg.schemaVersion = 2;
+  }
+  return pkg;
+}
+function openPackageFile(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  if(PKG && !confirm('Opening a new file will replace everything currently loaded that hasn\'t been saved. Continue?')){
+    input.value='';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(){
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(e){ alert('This does not look like a valid task package file.'); input.value=''; return; }
+    if(!data || !data.flatform_participant_package || !data.stages){
+      alert('This does not look like a Flat⇄Form task package (exported from the Workshop Console\'s Package & Send page).');
+      input.value=''; return;
+    }
+    PKG = migratePackage(data);
+    VIEW_STAGE = PKG.progress.currentStage || 'pretest';
+    currentPkgFileName = f.name; currentPkgFileHandle = null;
+    startSession();
+    render();
+    toast('Welcome, '+(PKG.participant?PKG.participant.name:'')+' — Save will update "'+f.name+'"');
+    input.value='';
+  };
+  reader.onerror = function(){ alert('Could not read that file.'); input.value=''; };
+  reader.readAsText(f);
+}
+
+async function saveProgress(){
+  if(!PKG) return;
+  let json;
+  try{ json = JSON.stringify(PKG, null, 2); }
+  catch(e){ alert('Could not save: '+e.message); return; }
+
+  if(window.showSaveFilePicker){
+    try{
+      if(!currentPkgFileHandle){
+        currentPkgFileHandle = await window.showSaveFilePicker({
+          suggestedName: currentPkgFileName || ('participant-'+(PKG.participant?PKG.participant.code:'progress')+'.json'),
+          types: [{ description:'Flat⇄Form task package', accept:{'application/json':['.json']} }]
+        });
+      }
+      const w = await currentPkgFileHandle.createWritable();
+      await w.write(json); await w.close();
+      currentPkgFileName = currentPkgFileHandle.name;
+      toast('Saved to "'+currentPkgFileName+'" — share this file with your researcher');
+      return;
+    }catch(err){
+      if(err && err.name==='AbortError') return;
+      console.error(err);
+    }
+  }
+  const name = currentPkgFileName || ('participant-'+(PKG.participant?PKG.participant.code:'progress')+'.json');
+  currentPkgFileName = name;
+  const blob = new Blob([json], {type:'application/json'});
+  const reader = new FileReader();
+  reader.onload = function(){
+    const a=document.createElement('a'); a.href=reader.result; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Saved as "'+name+'" — share this file with your researcher');
+  };
+  reader.onerror=function(){ alert('Could not save (file read failed).'); };
+  reader.readAsDataURL(blob);
+}
+async function savePause(){
+  endCurrentSession('pause');
+  await saveProgress();
+  toast('Saved — you can safely close this tab and continue later');
+}
+
+// ════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════
+function render(){
+  const root = document.getElementById('root');
+  const psContainer = document.getElementById('ps-container');
+  if(PKG && (!VIEW_STAGE || !PKG.stages[VIEW_STAGE])) VIEW_STAGE = PKG.progress.currentStage;
+  const wantsActivity = PKG && VIEW_STAGE && VIEW_STAGE===PKG.progress.currentStage && PKG.progress.currentScreen==='activity';
+  const showingActivity = wantsActivity && !!getPanelStudioURL();
+  if(wantsActivity && !showingActivity && !psUrlMissingWarned){
+    psUrlMissingWarned = true;
+    toast('Set up Panel Studio\'s address (gear icon below) to continue this stage');
+  }
+  if(showingActivity){
+    psContainer.style.display='flex';
+    document.getElementById('ps-topbar-trail').innerHTML = renderProgressTrail(true) + renderMicroStep('activity');
+    loadTaskIntoPanelStudio(VIEW_STAGE);
+    return; // #root stays as-is underneath — no need to touch it while hidden
+  }
+  psContainer.style.display='none';
+  if(!PKG){ root.innerHTML = renderImportScreen(); return; }
+  const reviewingPast = VIEW_STAGE !== PKG.progress.currentStage;
+  const screen = reviewingPast ? 'reflect' : PKG.progress.currentScreen;
+  root.innerHTML = renderDashboard() + (VIEW_STAGE ? (screen==='reflect' ? renderStageReflect(VIEW_STAGE) : renderStageBrief(VIEW_STAGE)) : '');
+}
+async function backToTask(){
+  if(PKG.progress.currentScreen==='activity' && VIEW_STAGE){ await snapshotActivity(VIEW_STAGE); }
+  PKG.progress.currentScreen='reflect';
+  render();
+}
+
+function renderImportScreen(){
+  return `
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Welcome</h1>
+    <p class="sub">Import the task package your researcher gave you, or open a progress file you saved earlier to continue.</p>
+    <div class="card">
+      <div class="dropzone" onclick="document.getElementById('pkgInput').click()">
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px">⤓ Choose your task package file</div>
+        <div class="faint" style="font-size:12px">a .json file from your researcher, or your own saved progress file</div>
+      </div>
+      <input type="file" id="pkgInput" accept="application/json,.json" style="display:none" onchange="openPackageFile(this)">
+    </div>`;
+}
+
+function renderDashboard(){
+  const rows = STAGE_ORDER.map((sk,i)=>{
+    const st = PKG.stages[sk];
+    const isDone = (PKG.progress.completedStages||[]).includes(sk);
+    const isCurrent = sk===PKG.progress.currentStage;
+    const locked = !isDone && !isCurrent;
+    let cls='stage-row'+(isDone?' done':'')+(isCurrent?' current':'')+(locked?' locked':'');
+    const icon = isDone?'✓':(i+1);
+    const assignedNote = st.assigned ? (st.garment?st.garment.name:'') : '<span class="faint">not assigned by researcher yet</span>';
+    return `<div class="${cls}" ${(!locked)?`onclick="VIEW_STAGE='${sk}';render();"`:''} style="${locked?'':'cursor:pointer'}">
+      <div class="stagenum">${icon}</div>
+      <div class="spacer"><div style="font-weight:700;font-size:14px">${STAGE_NAME[sk]}</div><div class="faint" style="font-size:12px">${assignedNote}</div></div>
+      ${isCurrent?'<span class="badge '+sk+'">current</span>':isDone?'<span class="faint" style="font-size:11px">done</span>':''}
+    </div>`;
+  }).join('');
+  return `
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>${esc(PKG.participant.name)}</h1>
+    <p class="sub">Work through each stage in order. Save your progress after each one and share the file with your researcher.</p>
+    <div class="card"><div class="stage-list">${rows}</div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn ghost" onclick="document.getElementById('pkgInput2').click()">📂 Open a different file</button>
+        <input type="file" id="pkgInput2" accept="application/json,.json" style="display:none" onchange="openPackageFile(this)">
+        <button class="btn ghost" onclick="promptPanelStudioURL()" title="Set the web address of Panel Studio, so 'Open in Panel Studio' works">⚙ Panel Studio: ${getPanelStudioURL()?'<span class="mono">'+esc(getPanelStudioURL())+'</span>':'<span class="faint">not set</span>'}</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" onclick="savePause()">⏸ Save &amp; pause</button>
+        <button class="btn green" onclick="saveProgress()">💾 Save progress</button>
+      </div>
+    </div>`;
+}
+
+function scaffoldImagesHTML(g){
+  if(!g) return '<p class="faint" style="font-size:13px">No garment assigned for this stage yet — check with your researcher.</p>';
+  const figs=[];
+  if(g.fullImg) figs.push(['Full garment',g.fullImg]);
+  if(g.frontBackImg) figs.push(['Front & back',g.frontBackImg]);
+  if(g.flatSketchImg) figs.push(['Flat sketch',g.flatSketchImg]);
+  if(!figs.length) return '<p class="faint" style="font-size:13px">No reference images attached to this garment.</p>';
+  return `<div class="scaffold-imgs">${figs.map(([label,src])=>`<figure><img src="${src}"><figcaption>${label}</figcaption></figure>`).join('')}</div>`;
+}
+
+function markedSetsHTML(g){
+  if(!g || !g.markedSets || !g.markedSets.length) return '';
+  return g.markedSets.map((ms,i)=>{
+    const figs=[];
+    if(ms.full) figs.push(['Full garment',ms.full]);
+    if(ms.frontBack) figs.push(['Front & back',ms.frontBack]);
+    if(ms.flatSketch) figs.push(['Flat sketch',ms.flatSketch]);
+    if(!figs.length) return '';
+    return `<div style="margin-top:10px"><div class="faint" style="font-size:12px;font-weight:600;margin-bottom:4px">Marked-area option ${i+1}</div>
+      <div class="scaffold-imgs">${figs.map(([label,src])=>`<figure><img src="${src}"><figcaption>${label}</figcaption></figure>`).join('')}</div></div>`;
+  }).join('');
+}
+
+function downloadTaskFileForPanelStudio(stageKey){
+  const st = PKG.stages[stageKey];
+  if(!st || !st.assigned){ alert('This stage has not been assigned by your researcher yet.'); return; }
+  const g = st.garment || {};
+  const task = {
+    flatform_task: true,
+    stage: stageKey,
+    garment: { name:g.name, type:g.type, image:g.fullImg||'', frontBackImage:g.frontBackImg||'', flatSketchImage:g.flatSketchImg||'', groupPanelImage:g.arrangementScaffold||'' },
+    complexity: {s:'Simple',m:'Moderate',c:'Complex'}[st.cx]||st.cx,
+    styleLine: st.styleLine || null,
+    panels: (st.tray||[]).map(item=>({ image:item.img||null, shape:item.shape||null, label:item.label })),
+  };
+  const json = JSON.stringify(task, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const reader = new FileReader();
+  reader.onload = function(){
+    const a=document.createElement('a'); a.href=reader.result; a.download='task-'+stageKey+'-'+(g.name||'garment').replace(/\s+/g,'-')+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Task file downloaded — open Panel Studio and use "Import task"');
+  };
+  reader.onerror=function(){ alert('Could not build the task file.'); };
+  reader.readAsDataURL(blob);
+}
+
+function surveyFormHTML(stageKey){
+  const def = SURVEYDEF[stageKey];
+  if(!def) return '';
+  const st = PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  if(!st.response.survey) st.response.survey = def.qs.map(()=>null);
+  const ans = st.response.survey;
+  const qs = def.qs.map((q,i)=>{
+    if(q.t==='likert'){
+      const opts=[1,2,3,4,5].map(v=>`<label><input type="radio" name="sv_${stageKey}_${i}" value="${v}" ${ans[i]==v?'checked':''} onchange="setSurveyAnswer('${stageKey}',${i},${v})">${v}</label>`).join('');
+      return `<div class="qgroup"><div class="qtitle">${i+1}. ${esc(q.q)}</div>
+        <div class="likert"><span class="end">${q.ends[0]}</span><div class="opts">${opts}</div><span class="end">${q.ends[1]}</span></div></div>`;
+    }
+    if(q.t==='single'){
+      const opts=q.opts.map(o=>`<label><input type="radio" name="sv_${stageKey}_${i}" ${ans[i]===o?'checked':''} onchange="setSurveyAnswer('${stageKey}',${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</label>`).join('');
+      return `<div class="qgroup"><div class="qtitle">${i+1}. ${esc(q.q)}</div><div class="optlist">${opts}</div></div>`;
+    }
+    if(q.t==='multi'){
+      const cur = Array.isArray(ans[i])?ans[i]:[];
+      const opts=q.opts.map(o=>`<label><input type="checkbox" ${cur.includes(o)?'checked':''} onchange="toggleSurveyMulti('${stageKey}',${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</label>`).join('');
+      return `<div class="qgroup"><div class="qtitle">${i+1}. ${esc(q.q)}</div><div class="optlist">${opts}</div></div>`;
+    }
+    return `<div class="qgroup"><div class="qtitle">${i+1}. ${esc(q.q)}</div><textarea oninput="setSurveyAnswer('${stageKey}',${i},this.value)">${esc(ans[i]||'')}</textarea></div>`;
+  }).join('');
+  return `<div class="card"><h2>${esc(def.title)}</h2><p class="sub">${esc(def.sub||'')}</p>${qs}</div>`;
+}
+function setSurveyAnswer(stageKey,i,val){ PKG.stages[stageKey].response.survey[i]=val; }
+function toggleSurveyMulti(stageKey,i,opt){
+  const st=PKG.stages[stageKey]; if(!Array.isArray(st.response.survey[i])) st.response.survey[i]=[];
+  const arr=st.response.survey[i]; const at=arr.indexOf(opt);
+  if(at>-1) arr.splice(at,1); else arr.push(opt);
+}
+
+function refQuestionsHTML(def){
+  if(!def) return '';
+  return def.groups.map(g=>`${g.h?`<div style="font-weight:600;font-size:12px;color:var(--ink-faint);margin-top:10px;text-transform:uppercase">${esc(g.h)}</div>`:''}
+    ${g.qs.map(q=>`<div class="refq">${esc(q)}</div>`).join('')}`).join('');
+}
+
+function promptInterviewHTML(stageKey){
+  const pd=PROMPTDEF[stageKey], id=INTERVIEWDEF[stageKey];
+  if(!pd && !id) return '';
+  const st=PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  let out='';
+  if(pd && PKG.share.prompt){
+    out+=`<div class="card"><h2>${esc(pd.title)}</h2>
+      <p class="sub">Your researcher will ask you these questions face-to-face while reviewing your work. Use the box below for your own notes/responses as you discuss.</p>
+      <div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg)">${refQuestionsHTML(pd)}</div>
+      <div style="margin-top:12px"><textarea placeholder="Notes from the discussion…" oninput="PKG.stages['${stageKey}'].response.promptNotes=this.value">${esc(st.response.promptNotes||'')}</textarea></div>
+    </div>`;
+  }
+  if(id && PKG.share.interview){
+    out+=`<div class="card"><h2>${esc(id.title)}</h2>
+      <p class="sub">A semi-structured interview with your researcher, face-to-face. Use the box below for your own notes/responses.</p>
+      <div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg)">${refQuestionsHTML(id)}</div>
+      <div style="margin-top:12px"><textarea placeholder="Notes from the interview…" oninput="PKG.stages['${stageKey}'].response.interviewNotes=this.value">${esc(st.response.interviewNotes||'')}</textarea></div>
+    </div>`;
+  }
+  return out;
+}
+
+function uploadsHTML(stageKey){
+  const st=PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  const list=(st.response.uploads||[]).map((u,i)=>`<div class="filerow"><span>📎</span><span class="spacer">${esc(u.name)}</span><span class="faint">${(u.size/1024).toFixed(0)} KB</span><button class="btn ghost sm" onclick="removeUpload('${stageKey}',${i})" style="padding:2px 8px">✕</button></div>`).join('');
+  return `<div class="card"><h2>Uploads</h2>
+    <p class="sub">Add your exported panel arrangement, Clo3D screenshots/project file, or photos of your physical construction — whatever's relevant to this stage.</p>
+    <input type="file" multiple onchange="handleUploads('${stageKey}',this)">
+    <div class="filelist">${list||'<span class="faint" style="font-size:12px">no files added yet</span>'}</div>
+  </div>`;
+}
+async function handleUploads(stageKey,input){
+  const files=[...input.files]; if(!files.length) return;
+  const st=PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  st.response.uploads=st.response.uploads||[];
+  for(const f of files){
+    if(f.size>25*1024*1024) toast('"'+f.name+'" is quite large — this may take a moment.');
+    try{
+      const dataUrl=await readFileAsDataURL(f);
+      st.response.uploads.push({name:f.name,type:f.type,size:f.size,dataUrl,at:new Date().toISOString()});
+    }catch(err){ alert('Could not read "'+f.name+'": '+(err&&err.message||err)); }
+  }
+  input.value='';
+  render();
+  toast(files.length+' file(s) added');
+}
+function removeUpload(stageKey,i){ PKG.stages[stageKey].response.uploads.splice(i,1); render(); }
+
+function solutionCompareHTML(stageKey){
+  const st=PKG.stages[stageKey];
+  const g=st.garment;
+  if(!g || !g.solutionFile) return '';
+  return `<div class="card"><h2>Compare with the researcher's solution</h2>
+    <p class="sub">Once you've completed your arrangement, look at the solution below and reflect on how your process went — what matched, what was different, and why.</p>
+    <a class="btn" href="${g.solutionFile}" download="${esc(g.solutionFileName||'solution.pdf')}">⤓ Open/download solution file</a>
+  </div>`;
+}
+
+function renderProgressTrail(compact){
+  const done = PKG.progress.completedStages||[];
+  const shortLabel = {pretest:'Pre',s1:'1',s2:'2',s3:'3',posttest:'Post'};
+  const nodes = STAGE_ORDER.map(sk=>{
+    const isDone = done.includes(sk);
+    const isCurrent = sk===VIEW_STAGE;
+    const cls = isDone?'done':(isCurrent?'current '+sk:'upcoming');
+    const label = compact?'':`<div class="trail-node-label${isCurrent?' on':''}">${STAGE_NAME[sk].split(' · ')[0]}</div>`;
+    return `<div class="trail-node"><div class="trail-circle ${cls}">${isDone?'✓':shortLabel[sk]}</div>${label}</div>`;
+  });
+  return `<div class="trail${compact?' compact':''}">${nodes.join('<div class="trail-connector"></div>')}</div>`;
+}
+function renderMicroStep(activeScreen){
+  const steps=[['brief','Brief'],['activity','Activity'],['reflect','Reflect']];
+  return `<div class="microstep">${steps.map(([k,label],i)=>`${i>0?'<span class="sep">›</span>':''}<span class="${activeScreen===k?'on':''}">${label}</span>`).join('')}</div>`;
+}
+
+function renderStageBrief(stageKey){
+  const st=PKG.stages[stageKey];
+  return `<div class="screen">
+    ${renderProgressTrail(false)}
+    ${renderMicroStep('brief')}
+    <div class="card" style="border-color:var(--ink)">
+      <div class="row"><span class="badge ${stageKey}">${STAGE_NAME[stageKey]}</span></div>
+      <p class="sub" style="margin-top:8px">${STAGE_BRIEF[stageKey]}</p>
+      ${!st.assigned?'<div class="stepnote">Your researcher hasn\'t assigned a garment for this stage yet — check back once they have, or open an updated package file.</div>':''}
+      <h2 style="margin-top:6px">Garment</h2>
+      ${scaffoldImagesHTML(st.garment)}
+      ${stageKey==='s3'?markedSetsHTML(st.garment):''}
+      ${st.styleLine?`<p style="margin-top:8px;font-size:13px"><b>Style line:</b> ${esc(st.styleLine)}</p>`:''}
+      ${st.assigned?`<div class="row" style="margin-top:16px;gap:10px">
+        <button class="btn blue" onclick="openInPanelStudio('${stageKey}')">${esc(STAGE_VERB[stageKey])}</button>
+        <button class="btn ghost" onclick="downloadTaskFileForPanelStudio('${stageKey}')">⤓ Download task file instead</button>
+      </div>
+      <p class="faint" style="font-size:11px;margin-top:6px">This continues automatically — your work is saved as you go. If it doesn't load, use the download option above instead.</p>`:''}
+    </div>
+  </div>`;
+}
+
+function renderStageReflect(stageKey){
+  const st=PKG.stages[stageKey];
+  const isDone=(PKG.progress.completedStages||[]).includes(stageKey);
+  const idx=STAGE_ORDER.indexOf(stageKey);
+  const nextStage=STAGE_ORDER[idx+1];
+  return `<div class="screen">
+    ${renderProgressTrail(false)}
+    ${renderMicroStep('reflect')}
+    <div class="card" style="border-color:var(--ink)">
+      <div class="row"><span class="badge ${stageKey}">${STAGE_NAME[stageKey]}</span>${isDone?'<span class="faint" style="font-size:12px">recorded</span>':''}</div>
+      ${st.assigned?`<button class="btn ghost sm" style="margin-top:12px" onclick="openInPanelStudio('${stageKey}')">${psLoadedForStage===stageKey?'← Continue working':esc(STAGE_VERB[stageKey])}</button>`:''}
+    </div>
+    ${PKG.share.survey?surveyFormHTML(stageKey):''}
+    ${promptInterviewHTML(stageKey)}
+    ${uploadsHTML(stageKey)}
+    ${((stageKey==='pretest'||stageKey==='posttest')&&st.response&&st.response.submittedAt)?solutionCompareHTML(stageKey):''}
+    <div class="card">
+      <div class="row">
+        <button class="btn ghost" onclick="saveProgress()">💾 Save progress (without completing)</button>
+        <span class="spacer"></span>
+        <button class="btn green" onclick="completeStage('${stageKey}')">${isDone?'Re-save as complete':'Mark stage complete'+(nextStage?' & continue':'')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function completeStage(stageKey){
+  const st=PKG.stages[stageKey];
+  if(!st.assigned){ if(!confirm('This stage has no garment assigned yet — mark it complete anyway?')) return; }
+  if(!st.response) st.response=emptyResponse();
+  if(!st.response.submittedAt) st.response.submittedAt = new Date().toISOString();
+  st.completed=true; st.completedAt=new Date().toISOString();
+  if(!PKG.progress.completedStages.includes(stageKey)) PKG.progress.completedStages.push(stageKey);
+  const idx=STAGE_ORDER.indexOf(stageKey);
+  const next=STAGE_ORDER[idx+1];
+  if(next){ PKG.progress.currentStage=next; PKG.progress.currentScreen='brief'; VIEW_STAGE=next; }
+  else { endCurrentSession('completed'); }
+  render();
+  await saveProgress();
+  toast(next?'Stage complete — moved on to '+STAGE_NAME[next]:'All stages complete — thank you!');
+}
+
+render();
+</script>
+</body>
+</html>

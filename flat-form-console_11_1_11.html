@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Workshop Console — Flat ↔ Form (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --paper:#F1EFE7; --paper-2:#E9E6DB; --card:#FBFAF5;
+    --ink:#1A1B24; --ink-soft:#54545f; --ink-faint:#8a8a93;
+    --mat:#13322D; --mat-2:#0e2723; --mat-line:#245049; --chalk:#EDEAE0;
+    --digital:#2E54F0; --digital-ink:#1c39b8;
+    --physical:#BC5A28; --physical-ink:#9a4719;
+    --think:#6B3FD4; --survey:#B4820F; --interview:#1E7E6E; --hi:#E8A11C;
+    --done:#2f8f5b; --line:#C9C5B8; --r:13px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:"Newsreader",Georgia,serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--hi);color:var(--ink)}
+  button{font-family:inherit;cursor:pointer}
+  :focus-visible{outline:2.5px solid var(--digital);outline-offset:2px;border-radius:4px}
+  .mono{font-family:"JetBrains Mono",monospace}
+  h1,h2,h3,h4,.disp{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;letter-spacing:-.02em;line-height:1.05;margin:0}
+
+  .topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(8px) saturate(1.2);border-bottom:1px solid var(--line)}
+  .topbar .in{max-width:1240px;margin:0 auto;padding:0 22px;height:60px;display:flex;align-items:center;gap:18px}
+  .brand{font-family:"Bricolage Grotesque";font-weight:800;font-size:16px;display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+  .brand .sw{width:14px;height:14px;border:1.6px solid var(--ink);position:relative}
+  .brand .sw::after{content:"";position:absolute;inset:2px 2px auto auto;width:5px;height:5px;background:var(--hi)}
+  .brand small{font-family:"JetBrains Mono";font-weight:400;font-size:10px;letter-spacing:.12em;color:var(--ink-faint);text-transform:uppercase;border:1px solid var(--line);padding:2px 6px;border-radius:5px}
+  .pswitch{margin-left:auto;display:inline-flex;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:3px}
+  .pswitch button{border:0;background:transparent;font-family:"JetBrains Mono";font-size:12px;font-weight:600;letter-spacing:.04em;padding:7px 16px;border-radius:999px;color:var(--ink-soft)}
+  .pswitch button.on{background:var(--ink);color:var(--chalk)}
+  .who{font-family:"JetBrains Mono";font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:8px}
+  .who select{font-family:"JetBrains Mono";font-size:12px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:var(--card);color:var(--ink)}
+
+  .shell{max-width:1240px;margin:0 auto;padding:22px;display:grid;grid-template-columns:212px 1fr;gap:22px}
+  .shell.solo{grid-template-columns:1fr;max-width:820px}
+  nav.side{position:sticky;top:84px;align-self:start;display:flex;flex-direction:column;gap:4px}
+  nav.side .nh{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:6px 8px 8px}
+  nav.side button{display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;width:100%;padding:10px 12px;border-radius:9px;font-family:"Bricolage Grotesque";font-weight:600;font-size:15px;color:var(--ink-soft)}
+  nav.side button .ic{width:18px;height:18px;color:var(--ink-faint)}
+  nav.side button.on{background:var(--ink);color:var(--chalk)}
+  nav.side button.on .ic{color:var(--hi)}
+  nav.side button:not(.on):hover{background:var(--paper-2)}
+  nav.side .badge{margin-left:auto;font-family:"JetBrains Mono";font-size:10px;font-weight:700;background:var(--hi);color:var(--ink);border-radius:999px;padding:2px 7px;min-width:18px;text-align:center}
+
+  main.view{min-width:0}
+  .page-head{margin-bottom:18px}
+  .page-head .k{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint)}
+  .page-head h2{font-size:clamp(24px,3.4vw,34px);margin-top:5px}
+  .page-head p{color:var(--ink-soft);max-width:66ch;margin:8px 0 0;font-size:15.5px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .spacer{flex:1}.muted{color:var(--ink-soft)}.faint{color:var(--ink-faint)}
+  .mlabel{font-family:"JetBrains Mono";font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+
+  .btn{border:1px solid var(--ink);background:var(--ink);color:var(--chalk);border-radius:9px;padding:9px 15px;font-family:"JetBrains Mono";font-size:12.5px;font-weight:600;letter-spacing:.02em;display:inline-flex;align-items:center;gap:8px}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn.blue{background:var(--digital);border-color:var(--digital)}
+  .btn.sm{padding:6px 11px;font-size:11.5px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  .cx{display:inline-flex;align-items:center;gap:7px;font-family:"JetBrains Mono";font-size:11px;color:var(--ink-soft);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+  .cx i{width:7px;height:7px;border-radius:50%}
+  .cx.s i{background:var(--done)} .cx.m i{background:var(--survey)} .cx.c i{background:var(--physical)}
+  .tag{font-family:"JetBrains Mono";font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px}
+  .tag.s{background:#dcefe3;color:#1e5f3e} .tag.m{background:#f3e7c4;color:#7a5c10} .tag.c{background:#f0ddd0;color:#8a3d16}
+  .tag.phys{background:#f1ddd0;color:var(--physical-ink)} .tag.dig{background:#dde2fb;color:var(--digital-ink)}
+  .tag.ok{background:#dcefe3;color:#1e5f3e} .tag.wait{background:#f6e6c2;color:#7a5c10}
+
+  .strip{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
+  .seg{position:relative;width:24px;height:22px;border-radius:6px;border:1.5px solid var(--line);background:var(--card);display:grid;place-items:center;font-family:"JetBrains Mono";font-size:8px;font-weight:700;color:var(--ink-faint)}
+  .seg.done{background:var(--done);border-color:var(--done);color:#eafff3}
+  .seg.active{border-color:var(--hi);color:var(--physical-ink);box-shadow:0 0 0 0 rgba(232,161,28,.55);animation:pz 1.8s infinite}
+  .seg.divider{width:8px;border:0;background:transparent}
+  @keyframes pz{70%{box-shadow:0 0 0 6px rgba(232,161,28,0)}100%{box-shadow:0 0 0 0 rgba(232,161,28,0)}}
+
+  .prow{display:grid;grid-template-columns:1.5fr 2.7fr auto;gap:14px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line)}
+  .prow:last-child{border-bottom:0}
+  .pname{font-family:"Bricolage Grotesque";font-weight:700;font-size:16px;display:flex;align-items:center;gap:9px}
+  .pname .dotn{width:9px;height:9px;border-radius:50%;background:var(--ink-faint)}
+  .pname .dotn.notify{background:var(--hi);box-shadow:0 0 0 0 rgba(232,161,28,.5);animation:pz 1.6s infinite}
+  .pid{font-family:"JetBrains Mono";font-size:10.5px;color:var(--ink-faint)}
+
+  .stagehead{display:flex;align-items:baseline;gap:12px;margin:26px 0 12px}
+  .stagehead .sn{font-family:"Bricolage Grotesque";font-weight:800;font-size:26px;color:var(--ink)}
+  .stagehead .nm{font-family:"Bricolage Grotesque";font-weight:700;font-size:18px}
+  .stagehead .vb{font-family:"JetBrains Mono";font-size:11px;color:var(--ink-faint);letter-spacing:.06em}
+  .stagehead:first-of-type{margin-top:6px}
+
+  .gcard{display:flex;flex-direction:column;gap:10px}
+  .gthumb{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;height:104px;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px}
+  .gthumb svg{height:74px;width:auto}
+  .tnote{font-size:14px;color:var(--ink-soft)}
+  .panelchips{display:flex;flex-wrap:wrap;gap:5px}
+  .pchip{font-family:"JetBrains Mono";font-size:10px;background:var(--paper-2);border:1px solid var(--line);border-radius:6px;padding:3px 7px;color:var(--ink-soft);display:flex;align-items:center;gap:5px}
+  .pchip svg{height:14px;width:14px}
+
+  .seltile{border:1.5px solid var(--line);border-radius:11px;padding:12px;background:var(--card);cursor:pointer;display:flex;gap:11px;align-items:center}
+  .seltile.sel{border-color:var(--ink);background:var(--paper-2)}
+  .seltile .mini{width:44px;height:44px;border-radius:8px;background:var(--paper-2);display:grid;place-items:center;flex:none}
+  .seltile .mini svg{height:32px}
+  .modepick{display:flex;gap:8px;flex-wrap:wrap}
+  .modepick button{border:1.5px solid var(--line);background:var(--card);border-radius:9px;padding:9px 13px;font-family:"JetBrains Mono";font-size:12px;color:var(--ink-soft)}
+  .modepick button.on{border-color:var(--ink);background:var(--ink);color:var(--chalk)}
+  .filterchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .filterchips button{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-family:"JetBrains Mono";font-size:11px;color:var(--ink-soft)}
+  .filterchips button.on{border-color:var(--ink);background:var(--ink);color:var(--chalk)}
+  .checks{display:flex;gap:8px;flex-wrap:wrap}
+  .chk{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line);border-radius:9px;padding:8px 12px;font-family:"JetBrains Mono";font-size:11.5px;color:var(--ink-soft);user-select:none;cursor:pointer}
+  .chk.on{border-color:var(--ink);color:var(--ink)}
+  .chk .bx{width:14px;height:14px;border:1.5px solid var(--ink-faint);border-radius:4px;display:grid;place-items:center}
+  .chk.on .bx{background:var(--ink);border-color:var(--ink)}
+  .chk.on .bx::after{content:"✓";color:var(--chalk);font-size:10px;line-height:1}
+
+  .matrix{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+  table.mx{border-collapse:collapse;width:100%;font-family:"JetBrains Mono";font-size:11px}
+  table.mx th,table.mx td{padding:8px 7px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.mx thead th{position:sticky;top:0;background:var(--paper-2);color:var(--ink-soft);font-weight:500;letter-spacing:.04em;font-size:10px}
+  table.mx td.name{text-align:left;font-family:"Bricolage Grotesque";font-weight:700;font-size:13px}
+  .cell{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--line);display:inline-block}
+  .cell.done{background:var(--done);border-color:var(--done)}.cell.active{background:var(--hi);border-color:var(--hi)}
+
+  .chart{display:flex;align-items:flex-end;gap:14px;height:150px;padding:6px 0 0}
+  .bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
+  .bcol .bars{display:flex;gap:5px;align-items:flex-end;height:100%}
+  .bcol .bar{width:16px;border-radius:4px 4px 0 0}
+  .bcol .lab{font-family:"JetBrains Mono";font-size:10px;color:var(--ink-soft);text-align:center}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}
+  .legend span{display:flex;align-items:center;gap:7px;font-family:"JetBrains Mono";font-size:11px;color:var(--ink-soft)}
+  .legend i{width:13px;height:9px;border-radius:2px}
+
+  textarea.find,input.txt,select.txt{width:100%;font-family:"Newsreader";font-size:15px;border:1.5px solid var(--line);border-radius:10px;padding:12px 13px;background:var(--card);color:var(--ink);resize:vertical}
+  select.txt{font-family:"JetBrains Mono";font-size:13px}
+  textarea.find{min-height:120px}
+  .saved{background:var(--paper-2);border:1px dashed var(--line);border-radius:10px;padding:13px 14px;font-size:15px}
+  .artrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dotted var(--line)}
+  .artrow:last-child{border:0}
+  .artrow .ai{width:30px;height:30px;border-radius:7px;background:var(--paper-2);display:grid;place-items:center;color:var(--ink-soft)}
+  .artrow a{font-family:"JetBrains Mono";font-size:12.5px;color:var(--digital-ink);text-decoration:none}.artrow a:hover{text-decoration:underline}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--chalk);border-radius:11px;padding:13px 18px;font-family:"JetBrains Mono";font-size:13px;display:flex;align-items:center;gap:11px;z-index:80;transition:.3s;box-shadow:0 18px 40px -16px rgba(0,0,0,.5);max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .d{width:9px;height:9px;border-radius:50%;background:var(--hi)}
+
+  .pview{max-width:740px;margin:0 auto}
+  .login{text-align:center;padding:50px 24px}
+  .login svg{height:90px;margin-bottom:20px}.login h2{font-size:30px;margin-bottom:6px}
+  .login .field{max-width:360px;margin:18px auto 0;text-align:left}
+  .ptask-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .ptask-head .tnum{font-family:"Bricolage Grotesque";font-weight:800;font-size:46px;line-height:.85;color:var(--ink)}
+  .refer{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .refer .rt{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;min-width:120px}
+  .refer .rt .k{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+  .refer .rt .v{font-family:"Bricolage Grotesque";font-weight:700;font-size:15px;margin-top:3px}
+  .psteps{list-style:none;margin:18px 0 0;padding:0;position:relative}
+  .psteps::before{content:"";position:absolute;left:14px;top:5px;bottom:14px;width:2px;background:var(--line)}
+  .psteps li{position:relative;padding:0 0 14px 42px;font-size:16px}
+  .psteps li .n{position:absolute;left:0;top:-2px;width:30px;height:30px;border-radius:50%;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;font-family:"JetBrains Mono";font-weight:700;font-size:12px;color:var(--ink-soft)}
+  .scaffold-note{margin-top:14px;background:var(--mat);color:var(--chalk);border-radius:11px;padding:13px 15px;display:flex;gap:11px;align-items:center;font-size:14px}
+  .scaffold-note .si{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.08);display:grid;place-items:center;color:var(--hi);flex:none}
+  .workspace-mock{margin-top:16px;border:2px dashed var(--line);border-radius:14px;min-height:150px;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-family:"JetBrains Mono";font-size:12.5px;text-align:center;background:repeating-linear-gradient(45deg,transparent,transparent 12px,rgba(0,0,0,.015) 12px,rgba(0,0,0,.015) 24px)}
+  .recbar{display:flex;align-items:center;gap:9px;font-family:"JetBrains Mono";font-size:11.5px;color:var(--ink-soft);margin-top:14px}
+  .recbar .rec{width:9px;height:9px;border-radius:50%;background:#c0392b;animation:pz2 2s infinite}
+  @keyframes pz2{0%,100%{opacity:1}50%{opacity:.3}}
+  .empty{text-align:center;padding:54px 20px;color:var(--ink-soft)}
+  .empty svg{height:60px;margin-bottom:16px;color:var(--ink-faint)}.empty h3{font-size:22px;margin-bottom:6px}
+
+  .doc-head{border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:18px 20px;margin-bottom:16px}
+  .doc-head .t{font-size:23px}
+  .doc-head .meta{font-family:"JetBrains Mono";font-size:11px;color:var(--ink-soft);margin-top:8px;line-height:1.7}
+  .infosheet{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:20px 22px}
+  .infosheet h4{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:18px 0 6px}
+  .infosheet h4:first-child{margin-top:0}
+  .infosheet p{margin:0 0 8px;font-size:15px;color:#2c2d38}
+  .infosheet ul{margin:0 0 8px;padding-left:18px;font-size:14.5px;color:#2c2d38}.infosheet li{margin-bottom:4px}
+  .form-field{margin-top:14px}
+  .form-field label.q{display:block;font-size:15px;margin-bottom:7px}
+  .form-field label.q .req{color:var(--physical);font-family:"JetBrains Mono";font-size:11px}
+  .yn{display:flex;gap:10px;flex-wrap:wrap}
+  .yn label{cursor:pointer;border:1.5px solid var(--line);border-radius:9px;padding:9px 16px;font-family:"JetBrains Mono";font-size:12px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:8px}
+  .yn input{position:absolute;opacity:0;width:0;height:0}
+  .yn input:checked + label{border-color:var(--ink);background:var(--ink);color:var(--chalk)}
+  .consent-stmt{display:flex;gap:11px;align-items:flex-start;background:var(--paper-2);border:1px solid var(--line);border-radius:11px;padding:14px;font-size:15px}
+  .consent-stmt input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--ink)}
+  .sigwrap{border:1.5px dashed var(--line);border-radius:11px;background:var(--card);position:relative}
+  canvas#sigpad{display:block;width:100%;height:120px;border-radius:11px;touch-action:none;cursor:crosshair}
+  .sighint{position:absolute;left:14px;bottom:8px;font-family:"JetBrains Mono";font-size:11px;color:var(--ink-faint);pointer-events:none}
+
+  .survey-q{padding:18px 0;border-bottom:1px solid var(--line)}.survey-q:last-child{border:0}
+  .survey-q .qn{font-family:"JetBrains Mono";font-size:11px;color:var(--ink-faint);font-weight:700}
+  .survey-q .qt{font-size:16px;margin:5px 0 11px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .survey-q .qtype{font-family:"JetBrains Mono";font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:5px;padding:2px 6px;color:var(--ink-faint)}
+  .likert{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .likert .ends{font-family:"JetBrains Mono";font-size:11px;color:var(--ink-faint)}
+  .likert .opt input{position:absolute;opacity:0;width:0;height:0}
+  .likert .opt label{cursor:pointer;width:38px;height:38px;border:1.5px solid var(--line);border-radius:9px;display:grid;place-items:center;font-family:"JetBrains Mono";font-size:13px;color:var(--ink-soft)}
+  .likert .opt input:checked + label{background:var(--ink);color:var(--chalk);border-color:var(--ink)}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt-row{display:flex;align-items:center;gap:11px;border:1.5px solid var(--line);border-radius:10px;padding:11px 13px;cursor:pointer;font-size:15px;color:#2c2d38}
+  .opt-row input{position:absolute;opacity:0;width:0;height:0}
+  .opt-row .mk{width:18px;height:18px;border:1.8px solid var(--ink-faint);flex:none;display:grid;place-items:center}
+  .opt-row.radio .mk{border-radius:50%}.opt-row.check .mk{border-radius:5px}
+  .opt-row input:checked ~ .mk{background:var(--ink);border-color:var(--ink)}
+  .opt-row input:checked ~ .mk::after{content:"";width:8px;height:8px;background:var(--chalk);border-radius:inherit}
+  .opt-row:has(input:checked){border-color:var(--ink);background:var(--paper-2)}
+  .q-open textarea{width:100%;min-height:84px;font-family:"Newsreader";font-size:15px;border:1.5px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--card);resize:vertical}
+
+  /* ---- participant workspace (drag-arrange A4 canvas) ---- */
+  .ws2{margin-top:10px}
+  .ws-tray{display:flex;gap:8px;overflow-x:auto;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--paper-2);min-height:86px;align-items:center}
+  .ws-tray .ptile{flex:0 0 auto;width:66px;height:66px;border:1.5px solid var(--line);border-radius:9px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;color:var(--ink);padding:4px}
+  .ws-tray .ptile svg{height:30px}
+  .ws-tray .ptile img{max-height:34px;max-width:52px;object-fit:contain}
+  .ws-tray .ptile .lb{font-family:"JetBrains Mono";font-size:8px;color:var(--ink-faint);margin-top:3px;max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ws-tray .emptray{color:var(--ink-faint);font-family:"JetBrains Mono";font-size:11px;padding:0 8px}
+  .ws-tools{display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap}
+  .ws-tools .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .ws-tools .seg button{border:0;background:var(--card);padding:7px 12px;font-family:"JetBrains Mono";font-size:13px;color:var(--ink)}
+  .ws-tools .seg button:hover{background:var(--paper-2)}
+  .ws-tools .zlabel{font-family:"JetBrains Mono";font-size:12px;color:var(--ink-soft);min-width:48px;text-align:center;padding:0 4px}
+  .ws-toggle{display:inline-flex;align-items:center;gap:8px;font-family:"JetBrains Mono";font-size:12px;color:var(--ink-soft);cursor:pointer;user-select:none}
+  .ws-toggle .bx{width:32px;height:18px;border-radius:999px;background:var(--line);position:relative;transition:.2s}
+  .ws-toggle.on .bx{background:var(--digital)}
+  .ws-toggle .bx::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s}
+  .ws-toggle.on .bx::after{left:16px}
+  .ws-view{height:380px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:#f3f3ef;position:relative}
+  .ws-canvas{position:relative}
+  .ws-scale{position:absolute;top:0;left:0;transform-origin:0 0;background:#fff;box-shadow:0 0 0 1px var(--line);background-image:linear-gradient(rgba(0,0,0,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.045) 1px,transparent 1px);background-size:37.4px 37.4px}
+  .ws-template{position:absolute;inset:0;pointer-events:none;opacity:.34}
+  .ws-template svg{width:100%;height:100%;display:block}
+  .ws-placed{position:absolute;cursor:grab;touch-action:none;display:flex;flex-direction:column;align-items:center;color:var(--ink);filter:drop-shadow(0 2px 4px rgba(0,0,0,.18))}
+  .ws-placed svg{height:72px;pointer-events:none}
+  .ws-placed img{max-height:96px;max-width:150px;object-fit:contain;pointer-events:none}
+  .ws-placed .rm{position:absolute;top:-9px;right:-9px;width:19px;height:19px;border-radius:50%;background:var(--physical);color:#fff;border:0;font-size:11px;display:none;align-items:center;justify-content:center;line-height:1;cursor:pointer}
+  .ws-placed:hover .rm{display:flex}
+  .ws-drag-ghost{position:fixed;z-index:200;pointer-events:none;opacity:.85;color:var(--ink)}
+  .ws-drag-ghost svg{height:52px}.ws-drag-ghost img{max-height:60px}
+  .ws-panel{position:absolute;cursor:grab;touch-action:none;user-select:none}
+  .ws-panel .pcontent{transform-origin:center center;color:var(--ink);filter:drop-shadow(0 2px 4px rgba(0,0,0,.16));border-radius:4px}
+  .ws-panel .pcontent svg{height:80px;display:block}
+  .ws-panel .pcontent img{display:block}
+  .ws-panel.selected .pcontent{outline:2px solid var(--digital);outline-offset:3px}
+  .ws-panel .pctrl{position:absolute;left:50%;top:-36px;transform:translateX(-50%);display:none;gap:2px;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:9px;padding:3px;box-shadow:0 8px 20px -10px rgba(0,0,0,.5);white-space:nowrap;z-index:5}
+  .ws-panel.selected .pctrl{display:flex}
+  .ws-panel .pctrl button{width:25px;height:25px;border:0;background:transparent;border-radius:6px;font-size:14px;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .ws-panel .pctrl button:hover{background:var(--paper-2)}
+  .ws-panel .pctrl button.rm{color:var(--physical-ink)}
+  .hintbox{margin-top:14px;background:var(--paper-2);border:1px solid var(--line);border-left:4px solid var(--survey);border-radius:11px;padding:13px 15px;font-size:14.5px}
+  .preftiles{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .preftile{width:76px;min-height:74px;border:1px solid var(--line);border-radius:10px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;color:var(--ink)}
+  .preftile svg{height:34px}
+  .preftile img{max-height:38px;max-width:60px;object-fit:contain}
+  .preftile .lb{font-family:"JetBrains Mono";font-size:8px;color:var(--ink-faint);margin-top:4px;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .uploadzone{margin-top:8px;border:1.5px dashed var(--line);border-radius:12px;background:var(--paper-2);padding:16px}
+  .uploadzone input[type=file]{font:inherit;font-size:13px}
+  .upchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .upchip{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:6px 8px 6px 6px;max-width:230px}
+  .upchip img{width:34px;height:34px;object-fit:cover;border-radius:6px}
+  .upchip .fic{width:26px;height:26px;color:var(--digital);display:flex;align-items:center;justify-content:center}
+  .upchip .un{font-family:"JetBrains Mono";font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .upchip .rmup{margin-left:auto;border:0;background:transparent;color:var(--physical-ink);cursor:pointer;font-size:13px;padding:2px 4px}
+  .filelink{display:inline-block;font-family:"JetBrains Mono";font-size:12px;color:var(--digital-ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 11px;margin:4px;text-decoration:none}
+  .scfgrid{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+  .scfitem{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px;max-width:280px}
+  .scfrole{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:7px}
+  .scfitem img{max-height:180px;max-width:260px;object-fit:contain;border-radius:8px;display:block}
+  .scfmissing{font-family:"JetBrains Mono";font-size:11px;color:var(--ink-faint);padding:14px 6px;text-align:center;border:1px dashed var(--line);border-radius:8px}
+  .istepper{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+  .istep{font-family:"JetBrains Mono";font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);color:var(--ink-soft);background:var(--card)}
+  .istep.cur{border-color:var(--ink);color:var(--ink);font-weight:700;background:var(--paper-2)}
+  .istep.done{color:#fff;background:var(--interview);border-color:var(--interview)}
+  .iarrow{color:var(--ink-faint);font-family:"JetBrains Mono";font-size:12px}
+  .phase-banner{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ink);border-radius:12px;padding:11px 16px;margin-bottom:18px}
+  .phase-banner .pb-stage{font-family:"Bricolage Grotesque";font-weight:700;font-size:15px}
+  .phase-banner .pb-now{margin-left:auto;color:#fff;font-family:"JetBrains Mono";font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:4px 12px;border-radius:999px}
+  .qgrp{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:12px 0 4px}
+  .qlist{margin:0 0 4px;padding-left:20px}
+  .qlist li{font-size:14px;padding:3px 0;line-height:1.45}
+  .conduct{background:var(--mat);color:var(--chalk);border-radius:16px;padding:20px;margin-bottom:20px}
+  .conduct h3{font-family:"Bricolage Grotesque";font-size:20px;margin-bottom:3px}
+  .conduct .sub{color:#9bb4ad;font-size:13px;margin-bottom:14px}
+  .crow{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.13);border-radius:12px;padding:13px 15px;margin-bottom:10px}
+  .crow.cur{border-color:var(--hi);box-shadow:0 0 0 1px var(--hi)}
+  .crow .chead{display:flex;align-items:center;gap:10px}
+  .crow .cname{font-family:"Bricolage Grotesque";font-weight:700;font-size:15px}
+  .crow .who{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.2);color:#9bb4ad}
+  .crow .cstatus{margin-left:auto;font-family:"JetBrains Mono";font-size:11px}
+  .crow .cstatus.done{color:#7BD88F}.crow .cstatus.live{color:var(--hi)}.crow .cstatus.pend{color:#9bb4ad}
+  .crow .cbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+  .crow details{margin-top:10px}
+  .crow details summary{cursor:pointer;font-family:"JetBrains Mono";font-size:12px;color:#9bb4ad}
+  .crow .qbox{margin-top:8px;background:rgba(0,0,0,.18);border-radius:9px;padding:10px 14px;max-height:220px;overflow:auto}
+  .crow .qbox .qgrp{color:rgba(255,255,255,.5)}
+  .crow .qbox .qlist li{color:#e8e8e2}
+  .crow textarea{width:100%;margin-top:9px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.16);border-radius:8px;color:#fff;padding:9px 11px;font:inherit;font-size:13px;min-height:54px;resize:vertical}
+  .btn.cw{background:#fff;color:var(--mat);border-color:#fff}
+  .btn.cw.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.3)}
+  .hintbox .ht{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--survey);margin-bottom:6px}
+
+  @media (max-width:880px){
+    .shell{grid-template-columns:1fr}
+    nav.side{position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
+    nav.side .nh{display:none}nav.side button{white-space:nowrap}
+    .g4{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:1fr} .g2{grid-template-columns:1fr}
+    .prow{grid-template-columns:1fr;gap:10px}
+    .topbar .in{flex-wrap:wrap;height:auto;padding-top:10px;padding-bottom:10px;gap:12px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <div class="brand"><span class="sw"></span>Workshop&nbsp;Console <small>Flat ↔ Form</small></div>
+  <div class="pswitch" id="pswitch"><button data-p="researcher" class="on">Researcher</button><button data-p="participant">Participant</button></div>
+  <div class="who" id="whoBox"></div>
+</div></div>
+
+<div id="root"></div>
+<div class="toast" id="toast"><span class="d"></span><span id="toastMsg"></span></div>
+
+<script>
+/* ===== stages & phases ===== */
+const PHASES = [
+  {key:'pretest',label:'Pre',g:'test'},{key:'pretest_survey',label:'PS',g:'survey'},{key:'div1',divider:true},
+  {key:'s1_task',label:'S1',g:'task'},{key:'s1_prompt',label:'P',g:'think'},{key:'s1_survey',label:'S',g:'survey'},{key:'s1_interview',label:'I',g:'intv'},{key:'div2',divider:true},
+  {key:'s2_task',label:'S2',g:'task'},{key:'s2_prompt',label:'P',g:'think'},{key:'s2_survey',label:'S',g:'survey'},{key:'s2_interview',label:'I',g:'intv'},{key:'div3',divider:true},
+  {key:'s3_task',label:'S3',g:'task'},{key:'s3_prompt',label:'P',g:'think'},{key:'s3_survey',label:'S',g:'survey'},{key:'s3_interview',label:'I',g:'intv'},{key:'div4',divider:true},
+  {key:'posttest',label:'Post',g:'test'},{key:'posttest_survey',label:'PS',g:'survey'},
+];
+const PHASE_KEYS = PHASES.filter(p=>!p.divider).map(p=>p.key);
+const stagePhaseKey = s=>({pretest:'pretest',s1:'s1_task',s2:'s2_task',s3:'s3_task',posttest:'posttest'}[s]);
+const surveyPhaseKey = s=>({pretest:'pretest_survey',s1:'s1_survey',s2:'s2_survey',s3:'s3_survey',posttest:'posttest_survey'}[s]);
+const promptPhaseKey = s=>({s1:'s1_prompt',s2:'s2_prompt',s3:'s3_prompt'}[s]);
+const interviewPhaseKey = s=>({s1:'s1_interview',s2:'s2_interview',s3:'s3_interview'}[s]);
+const WORKSHOP_STAGES=['s1','s2','s3'];
+
+const SHAPE = {
+  bodice:'<svg viewBox="0 0 40 50"><path d="M8 6 Q20 0 32 6 L34 14 L40 22 L34 26 L33 48 L7 48 L6 26 L0 22 L6 14 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  back:'<svg viewBox="0 0 40 50"><path d="M9 6 Q20 3 31 6 L34 14 L40 22 L34 26 L33 48 L7 48 L6 26 L0 22 L6 14 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  sleeve:'<svg viewBox="0 0 40 50"><path d="M6 4 Q20 -2 34 4 L30 48 L10 48 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  collar:'<svg viewBox="0 0 40 50"><path d="M4 30 Q20 6 36 30 L30 38 Q20 22 10 38 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  cuff:'<svg viewBox="0 0 40 50"><rect x="6" y="16" width="28" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  skirt:'<svg viewBox="0 0 40 50"><path d="M12 4 L28 4 L38 48 L2 48 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  pocket:'<svg viewBox="0 0 40 50"><path d="M9 12 L31 12 L31 32 L20 40 L9 32 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  yoke:'<svg viewBox="0 0 40 50"><path d="M4 20 Q20 8 36 20 L34 30 Q20 22 6 30 Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+};
+const garmentIcon = parts=> parts.slice(0,3).map(p=>SHAPE[p]||SHAPE.bodice).join('');
+const GARMENTS = [
+];
+// Basic panel set: a single global list of individual panel shapes used for
+// pre-test / post-test tasks (participants design panels for a garment from
+// scratch using these basics, rather than being given the garment's own
+// panels). Editable any time; no per-task selection needed — pre/post-test
+// tasks pull from this automatically.
+let BASIC_PANELS = [];
+
+/* tasks belong to a stage and carry a complexity */
+const TASKS = [
+];
+let TASK_SEQ=100;
+let GARMENT_SEQ=100;
+const tasksOf = s=>TASKS.filter(t=>t.stage===s);
+const taskById = id=>TASKS.find(t=>t.id===id);
+
+const STAGEINFO = {
+  pretest:{n:'00',name:'Pre-test',verb:'baseline',brief:'Complete the assigned baseline task on your own. Work as you normally would.',
+    refer:['Assigned garment','Workspace'],steps:['Study the garment','Attempt the task','Submit when done']},
+  posttest:{n:'PT',name:'Post-test',verb:'closing',brief:'Complete the assigned closing task on your own.',
+    refer:['Assigned garment','Workspace'],steps:['Study the garment','Attempt the task','Submit when done']},
+  s1:{n:'01',name:'Identify the panels',verb:'identify & sort',
+    brief:'You are given a garment and a set of panels. Select the right panels for it and arrange them in the template.',
+    refer:['Garment','Panel tray','Template','Workspace'],
+    steps:['See the garment','See the panels','Observe the workspace','Select panels from the tray','Arrange & modify to suit','Scale correctly']},
+  s2:{n:'02',name:'Construct the garment',verb:'construct',
+    brief:'You are given a list of panels. Construct the garment from them.',
+    refer:['Panel list','Garment image (scaffold)','Workspace'],
+    stepsPhys:['Confirm the panels','Take a print','Cut the panels','Arrange in physical space','Join with cello tape','Finish'],
+    stepsDig:['Confirm the panels','Export panels as SVG','Import SVG into Clo3D','Create an avatar','Set up the panels','Sew & construct','Finish'],
+    scaffold:'Use the actual garment image to visualise what you are constructing.'},
+  s3:{n:'03',name:'Style-line panel',verb:'develop panel',
+    brief:'You are given the garment image with a style line. Develop the shape of the single panel that can be built around that style line.',
+    refer:['Garment image with style line','Scaffolds','Workspace'],
+    steps:['Read the style line on the garment','Develop the single-panel shape around the style line','Join the panel and confirm the shape']},
+};
+
+function progressTo(idxDone, activeIdx){const p={};PHASE_KEYS.forEach((k,i)=>{p[k]=i<=idxDone?'done':(i===activeIdx?'active':'pending');});return p;}
+const PARTICIPANTS = [
+  {id:'P-01',name:'Fidaa',code:'SI-01',email:'fidaa@example.com',phone:'+91 90000 00001',detail:'M.Des Y1',mode:'physical',consent:{given:true,recording:'yes',age:'21',bg:'M.Des, Fashion'},progress:progressTo(15,-1),notify:false,active:null,findings:'Strong stimulus analysis; identified all A-line panels on first read. Slower on darts — relied on landmark extraction.',arts:3,surveys:{pretest:{title:'Reflection — pre-test',submittedAt:'2026-06-20T10:00:00Z',responses:[{q:'How easy was it to complete this test?',type:'likert',answer:2},{q:'What were the main challenges you faced?',type:'open',answer:'Reading the sleeve panel shape from the flat image.'},{q:'How confident are you to attempt such a task?',type:'single',answer:'Moderately'}]}}},
+  {id:'P-02',name:'Thrishna',code:'SI-02',email:'thrishna@example.com',phone:'+91 90000 00002',detail:'M.Des Y1',mode:'digital',consent:{given:true,recording:'yes'},progress:progressTo(9,10),notify:false,active:{stage:'s3',taskId:'t3b',garmentId:'g3',cx:'m',line:'Curved princess line',mode:'digital',share:{prompt:true,survey:true,interview:true}},findings:'',arts:2},
+  {id:'P-03',name:'Spoorthi',code:'SI-03',email:'spoorthi@example.com',phone:'+91 90000 00003',detail:'M.Des Y2',mode:'digital',consent:{given:true,recording:'yes'},progress:progressTo(5,-1),notify:true,active:null,findings:'',arts:2},
+  {id:'P-04',name:'Sreenidhi',code:'SI-04',email:'sreenidhi@example.com',phone:'+91 90000 00004',detail:'M.Des Y1',mode:'physical',consent:{given:true,recording:'no'},progress:progressTo(3,4),notify:false,active:{stage:'s1',taskId:'t1b',garmentId:'g2',cx:'s',mode:'physical',share:{prompt:true,survey:true,interview:false}},findings:'',arts:1},
+  {id:'P-05',name:'Inbavarsha',code:'SI-05',email:'inba@example.com',phone:'+91 90000 00005',detail:'M.Des Y2',mode:'digital',consent:{given:true,recording:'yes'},progress:progressTo(1,2),notify:false,active:null,findings:'',arts:1},
+  {id:'P-06',name:'Lochana',code:'SI-06',email:'lochana@example.com',phone:'+91 90000 00006',detail:'M.Des Y1',mode:'physical',consent:{given:false},progress:progressTo(-1,-1),notify:false,active:null,findings:'',arts:0},
+  {id:'P-07',name:'Keshav',code:'SI-07',email:'keshav@example.com',phone:'+91 90000 00007',detail:'M.Des Y2',mode:'digital',consent:{given:true,recording:'yes'},progress:progressTo(7,-1),notify:false,active:null,findings:'Visualised the construction order before touching panels — compiled reasoning. Fast on Stage 2.',arts:3},
+];
+
+const L_EASE=['Very easy','Very hard'], L_DIFF=['Not at all','Very much'];
+const SURVEYDEF = {
+  pretest:{title:'Reflection — pre-test',sub:'Tell us how you experienced the test.',qs:[
+    {t:'likert',q:'How easy was it to complete this test?',ends:L_EASE},
+    {t:'open',q:'What were the main challenges you faced?'},
+    {t:'single',q:'How confident are you to attempt such a task?',opts:['Not at all','Slightly','Moderately','Very','Extremely']},
+    {t:'likert',q:'Was it easy to visualise the garment from its image?',ends:L_EASE},
+    {t:'likert',q:'Was it easy to identify the panels correctly?',ends:L_EASE},
+    {t:'likert',q:'Was it easy to identify the shapes of the panels?',ends:L_EASE},
+    {t:'multi',q:'Which shapes were difficult to judge? (select all that apply)',opts:['Bodice','Sleeve','Collar','Skirt panel','Yoke','Pocket','Dart']},
+    {t:'single',q:'Is it necessary to visualise the garment to decide the panel shape?',opts:['Yes, always','Sometimes','No']},
+    {t:'single',q:'Can you decide whether a panel is correct for the chosen garment?',opts:['Yes, confidently','Yes, with effort','Not sure','No']},
+    {t:'open',q:'Anything else about how you approached this test?'},
+  ]},
+  s1:{title:'Survey — Stage 1 · Identify the panels',sub:'About selecting and arranging panels.',qs:[
+    {t:'single',q:'How did you determine which panel is most suitable?',opts:['By matching the garment shape','By prior knowledge of panels','By trial and elimination','Mostly by guessing']},
+    {t:'likert',q:'How easy was it to decide where to place each panel?',ends:L_EASE},
+    {t:'single',q:'Did you imagine folds while placing/creating panels?',opts:['Yes, clearly','Somewhat','No']},
+    {t:'single',q:'Did you imagine darts while placing/creating panels?',opts:['Yes, clearly','Somewhat','No']},
+    {t:'multi',q:'Which did you consider when deciding a new panel? (select all)',opts:['Functionality','Aesthetics','Gatherings','Piping','Seam allowance']},
+    {t:'likert',q:'How difficult was the panel arrangement?',ends:L_DIFF},
+    {t:'open',q:'What made any arrangement difficult to follow?'},
+    {t:'open',q:'How did you verify your arrangement was correct?'},
+  ]},
+  s2:{title:'Survey — Stage 2 · Construct the garment',sub:'About constructing from the given panels.',qs:[
+    {t:'single',q:'How did you start thinking about the construction?',opts:['Visualised the whole garment first','Started from one key panel','Followed a known sequence','Trial and error']},
+    {t:'single',q:'Which panel did you start with?',opts:['Front bodice','Back','Sleeve','Other']},
+    {t:'single',q:'After seeing the panels, did you modify them before constructing?',opts:['Yes, major changes','Yes, minor changes','No changes']},
+    {t:'likert',q:'How easy was it to construct from the panel image?',ends:L_EASE},
+    {t:'single',q:'Did the garment-image scaffold help you visualise the build?',opts:['Yes, a lot','Somewhat','Not really']},
+    {t:'open',q:'What struggles did you face while constructing the garment?'},
+    {t:'open',q:'What skills would help you do this better next time?'},
+  ]},
+  s3:{title:'Survey — Stage 3 · Style-line panel',sub:'About developing a panel around the style line.',qs:[
+    {t:'likert',q:'How easy was it to read the style line on the garment?',ends:L_EASE},
+    {t:'single',q:'What was your strategy to develop the panel around the line?',opts:['Spread from a central point','Follow the seams/darts','Slash and spread','Trial flattening']},
+    {t:'likert',q:'How challenging was developing the single-panel shape?',ends:L_DIFF},
+    {t:'single',q:'Did the panel need further change after first developing it?',opts:['Yes, major','Yes, minor','No']},
+    {t:'likert',q:'How challenging was confirming the panel fits the style line?',ends:L_DIFF},
+    {t:'open',q:'What did you learn by developing a panel from the style line?'},
+    {t:'open',q:'What complexities did you face, and how did you tackle them?'},
+  ]},
+};
+SURVEYDEF.posttest = Object.assign({},SURVEYDEF.pretest,{title:'Reflection — post-test',sub:'Tell us how you experienced the closing test.'});
+
+const PROMPTDEF = {
+  s1:{title:'Think-aloud · Stage 1 — retrospective (watch the recording)',groups:[
+    {h:'Selection of panels',qs:['How many panels did you observe the garment is having?','What different types of panels are required to construct the garment?','What features in each of these panels help you identify its type?','What is the purpose of an on-fold panel?']},
+    {h:'Creation of new panels',qs:['Will you reflect an existing panel shape to create a new panel?','Will you consider surrounding edges to decide the new panel\'s edges?','Will you modify the sleeve panel based on its joining position with the top panels?','Will you modify the panel to incorporate the folds and gatherings?']},
+    {h:'Arrangement of panels',qs:['Are there any conventions to follow to arrange the panels?','What logic do you follow when the arrangement differs from the conventional shape?','Where do you position sleeve cuffs, yoke panels, pockets, lapels, loops, etc.?']},
+    {h:'Evaluation of arrangement',qs:['Do we have a method to confirm whether the arrangement is working?','How do we verify whether any panels are missing?','How do we verify the arrangement is the correct one?']},
+  ]},
+  s2:{title:'Think-aloud · Stage 2 — concurrent',groups:[
+    {h:'',qs:['What is the task given to you?','What imagery did you get when you got this task?','Describe the type of panels you see in front of you.','What imagery did you get when you were given these panels?','How are you planning to construct the garment?','Which panel are you going to start the construction with?','What materials do you need to construct, and why those materials?']},
+  ]},
+  s3:{title:'Think-aloud · Stage 3 — concurrent',groups:[
+    {h:'',qs:['What is the task given to you?','What imagery did you get when you got this task?','Can you visualise how the drawn line would appear on the garment?','Can you visualise cutting along the drawn line to create a separated garment form?','What is your strategy to find the shape of the 2D panel from the 3D form?','How are you planning to flatten out the 3D form?','Where will you cut to spread the 3D form?','What is your thinking process while cutting the 3D form to a flat panel?','How do you decide whether the 2D panel needs further change?','What is your idea of creating a good working 2D panel by spreading the 3D form?','How are you planning to trace the shape as a flat 2D panel?','How will you attach the flat 2D panel back to the 3D garment where it was removed?','Where will you start attaching?','What complexities do you face while attaching the 2D panel to the garment?','How will you tackle these complexities?']},
+  ]},
+};
+const INTERVIEWDEF = {
+  s1:{title:'Interview · Stage 1 — semi-structured',groups:[
+    {h:'Overall process',qs:['Describe the process you followed to complete the workshop.','Did you make any guesses due to lack of information — what were they?']},
+    {h:'Garment assignment',qs:['Did the system assigning the garment help participants, or not?']},
+    {h:'Panel selection & creation',qs:['Were the available panels comprehensive enough to modify and create panels for your task?','Was it easy to modify and create new panels?','Was it challenging to identify the shape of the panels — which were easy and which more challenging?']},
+    {h:'Panel arrangement',qs:['Once shapes were identified, how did you decide each position in the arrangement?','What challenges did you face in the arrangement of panels?']},
+    {h:'Self-evaluation',qs:['How did you verify whether your arrangement is correct?','How did you verify you had no other panels left to create?','How did you ensure the arrangement also eases construction?']},
+  ]},
+  s2:{title:'Interview · Stage 2 — semi-structured',groups:[
+    {h:'',qs:['Can you explain what you understood when the task was given to you?','What challenges did you face when thinking about completing the task?','How did you verify whether the given panels were all suitable?','Did you face difficulties with the panels given?','Explain your process of construction.','What did you imagine doing when the panels were given to you?','What imagery did you get when you were given these panels?','Did you notice changes between how you visualised earlier and later? Explain.','Was what you made at the end the same as what you first imagined? If different, how — and what created the change?','When you were confused, how did you resolve it — what was your strategy?']},
+  ]},
+  s3:{title:'Interview · Stage 3 — semi-structured',groups:[
+    {h:'',qs:['Can you explain what you understood when the task was given to you?','What is the significance of this task in fashion design?','What challenges did you face to understand the task?','What is the first challenge given in this task?','How did you manage to complete the task?','What was your learning?','What was the second task, after cutting the 3D garment?','What challenges did you face while doing it?','What did you learn by doing this task?','What was the third task, after flattening the garment?','What challenges did you face while doing it?','What is your learning?','What was the last task given to you?','What were the challenges?','What is your learning while doing the task?','What is the benefit of this workshop for a fashion designer?']},
+  ]},
+};
+const RESEARCHER_LED={prompt:true,interview:true};
+const INSTR_KIND={prompt:'prompts',survey:'surveys',interview:'interviews'};
+const INSTR_TITLE={task:'Task',prompt:'Think-aloud',survey:'Survey',interview:'Interview',waiting:'Standby'};
+const INSTR_COLOR={task:'var(--ink)',prompt:'var(--think)',survey:'var(--survey)',interview:'var(--interview)',waiting:'var(--ink-faint)'};
+function instrDef(kind,stage){return kind==='survey'?(SURVEYDEF[stage]||null):kind==='prompt'?(PROMPTDEF[stage]||null):kind==='interview'?(INTERVIEWDEF[stage]||null):null;}
+function instrPhaseKey(kind,stage){return kind==='survey'?surveyPhaseKey(stage):kind==='prompt'?promptPhaseKey(stage):interviewPhaseKey(stage);}
+function instrFlow(a){return ['prompt','survey','interview'].filter(k=>a&&a.share&&a.share[k]&&instrDef(k,a.stage)&&instrPhaseKey(k,a.stage));}
+function phaseBanner(a,cur){const lbl=INSTR_TITLE[cur]||'Task',col=INSTR_COLOR[cur]||'var(--ink)';return `<div class="phase-banner" style="border-left-color:${col}"><span class="pb-stage">${STAGEINFO[a.stage].n} · ${STAGEINFO[a.stage].name}</span><span class="faint mono" style="font-size:11px">current phase</span><span class="pb-now" style="background:${col}">${lbl}</span></div>`;}
+function questionList(def){return def.groups.map(g=>`${g.h?`<div class="qgrp">${esc(g.h)}</div>`:''}<ol class="qlist">${g.qs.map(q=>`<li>${esc(q)}</li>`).join('')}</ol>`).join('');}
+
+const S = {
+  perspective:'researcher', rtab:'participants', selParticipant:null, curUser:null,
+  assign:{participant:null,activity:'pretest',taskId:null,garmentId:null,cxFilter:'all',mode:'physical',share:{prompt:true,survey:true,interview:true},distractors:{},forceShowPicker:false},
+  pkg:{participant:null, viewFilter:{pretest:'all',s1:'all',s2:'all',s3:'all',posttest:'all'}},
+  bulkImport:null, editingGarmentId:null, importedPackages:{},
+  participants:PARTICIPANTS, garments:GARMENTS, pstage:'task', flowQueue:[], addP:false,
+  addT:false, addTData:{name:'',type:'',cx:'s',stages:{pretest:true,s1:true,s2:true,s3:true,posttest:true},fullImg:null,frontBackImg:null,flatSketchImg:null,panelImgs:[],solutionFile:null,solutionFileName:'',arrangementScaffold:null,markedSets:[{full:null,frontBack:null,flatSketch:null},{full:null,frontBack:null,flatSketch:null}],desc:''}, confirmDel:null
+};
+
+/* helpers */
+const $ = (s,r=document)=>r.querySelector(s);
+const root = $('#root');
+const cxName = c=>({s:'Simple',m:'Moderate',c:'Complex'}[c]);
+const garment = id=>S.garments.find(g=>g.id===id);
+const today = ()=> new Date().toLocaleDateString('en-GB');
+function toast(msg){const t=$('#toast');$('#toastMsg').textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
+const notifyCount=()=>S.participants.filter(p=>p.notify).length;
+const phaseDoneCount=p=>PHASE_KEYS.filter(k=>p.progress[k]==='done').length;
+function nextStageFor(p){for(const s of ['pretest','s1','s2','s3','posttest']){if(p.progress[stagePhaseKey(s)]!=='done')return s;}return 'posttest';}
+function autoTask(stage){const pool=tasksOf(stage);return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;}
+function autoGarment(){
+  const a=S.assign;
+  let pool=S.garments.filter(g=>(g.stages||[]).includes(a.activity));
+  if(a.cxFilter&&a.cxFilter!=='all')pool=pool.filter(g=>g.cx===a.cxFilter);
+  if(!pool.length)pool=S.garments.filter(g=>(g.stages||[]).includes(a.activity)); // fall back to any difficulty if filtered pool is empty
+  return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
+}
+function nextCode(){const n=S.participants.length+1;return 'SI-'+String(n).padStart(2,'0');}
+function captureAddT(){const n=$('#atName');if(n)S.addTData.name=n.value;const t=$('#atType');if(t)S.addTData.type=t.value;const d=$('#atDesc');if(d)S.addTData.desc=d.value;}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function readImg(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error||new Error('File could not be read'));r.onabort=()=>rej(new Error('File read was aborted'));r.readAsDataURL(file);});}
+function garmentThumb(g,h){h=h||84;const src=g&&(g.fullImg||g.img);return src?`<img src="${src}" alt="" style="height:${h}px;max-width:100%;object-fit:contain;border-radius:6px"/>`:`<span style="color:var(--ink);display:flex;gap:6px;align-items:center">${garmentIcon(g?g.panels:['bodice'])}</span>`;}
+function instrumentsHTML(p){
+  const kinds=[['prompts','Think-aloud','var(--think)'],['surveys','Survey','var(--survey)'],['interviews','Interview','var(--interview)']];
+  const fmt=a=>Array.isArray(a)?(a.join(', ')||'—'):(a===null||a===''||a===undefined?'—':esc(String(a)));
+  let any=false;
+  const blocks=kinds.map(([map,label,color])=>{
+    const m=p[map];if(!m||!Object.keys(m).length)return '';any=true;
+    return Object.keys(m).map(stg=>{const sv=m[stg];
+      if(sv.responses){const items=sv.responses.map(r=>`<div style="padding:7px 0;border-bottom:1px dotted var(--line)"><div class="mono" style="font-size:10px;color:var(--ink-faint)">${r.type}</div><div style="font-size:14px">${esc(r.q)}</div><div style="font-size:14px;color:${color}"><b>${fmt(r.answer)}</b></div></div>`).join('');
+        return `<details style="border:1px solid var(--line);border-left:3px solid ${color};border-radius:10px;background:var(--paper-2);margin-bottom:8px;padding:0 12px"><summary style="cursor:pointer;padding:11px 0;font-family:'Bricolage Grotesque';font-weight:700;font-size:14px">${stg.toUpperCase()} · ${label} · ${sv.responses.length} responses</summary><div style="padding-bottom:10px">${items}</div></details>`;}
+      return `<div style="border:1px solid var(--line);border-left:3px solid ${color};border-radius:10px;background:var(--paper-2);margin-bottom:8px;padding:11px 14px"><div style="font-family:'Bricolage Grotesque';font-weight:700;font-size:14px">${stg.toUpperCase()} · ${label} <span class="faint mono" style="font-size:10px">researcher-led · conducted</span></div><div style="font-size:14px;margin-top:6px">${sv.notes?esc(sv.notes):'<span class="faint">completed — no notes recorded</span>'}</div></div>`;
+    }).join('');
+  }).join('');
+  return `<div class="mlabel" style="margin-top:14px">Instrument responses</div><div style="margin-top:6px">${any?blocks:'<div class="faint" style="font-size:14px">None captured yet.</div>'}</div>`;
+}
+function panelThumbs(g){if(g&&g.panelImgs&&g.panelImgs.length)return g.panelImgs.map((d,i)=>`<span class="pchip"><img src="${d}" style="width:16px;height:16px;object-fit:cover;border-radius:3px"/>panel ${i+1}</span>`).join('');return (g?g.panels:[]).map(p=>`<span class="pchip"><span style="color:var(--ink-soft)">${SHAPE[p]}</span>${p}</span>`).join('');}
+
+/* ---- panel tray + drag-arrange workspace ---- */
+let CUR_WS=null;
+const TEMPLATE_SVG=`<svg viewBox="0 0 1123 794" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="2" y="2" width="1119" height="790" fill="none" stroke="#8a8a8a" stroke-width="2"/>
+<line x1="374" y1="2" x2="374" y2="792" stroke="#8a8a8a" stroke-width="2"/>
+<line x1="748" y1="2" x2="748" y2="792" stroke="#8a8a8a" stroke-width="2"/>
+<line x1="2" y1="660" x2="1121" y2="660" stroke="#bbbbbb" stroke-width="1.5"/>
+<g font-family="JetBrains Mono, monospace" fill="#555" font-size="22" text-anchor="middle" letter-spacing="1">
+<text x="187" y="62">BACK</text><text x="561" y="62">FRONT</text><text x="935" y="62">SLEEVE</text></g>
+<g font-family="JetBrains Mono, monospace" fill="#777" font-size="17" text-anchor="middle">
+<text x="187" y="730">COLLARS</text><text x="561" y="730">YOKE</text><text x="935" y="722">CUFFS</text><text x="935" y="744">OTHERS</text></g>
+</svg>`;
+function descFromGarment(g){if(!g)return [];if(g.panelImgs&&g.panelImgs.length)return g.panelImgs.map((img,i)=>({img,label:(g.type||g.name)+' '+(i+1),from:g.name}));return (g.panels||[]).map(shape=>({shape,label:shape,from:g.name}));}
+function descFromBasicPanels(){return BASIC_PANELS.map((img,i)=>({img,label:'Basic panel '+(i+1),from:'Basic set'}));}
+function buildTrayFromDescs(baseDescs,distractGs){let arr=baseDescs.slice();(distractGs||[]).forEach(g=>{arr=arr.concat(descFromGarment(g));});arr=arr.map((d,i)=>Object.assign({id:'pn'+i},d));for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
+function buildTray(mainG,distractGs){return buildTrayFromDescs(descFromGarment(mainG),distractGs);}
+const descVis=d=>d.img?`<img src="${d.img}">`:(SHAPE[d.shape]||SHAPE.bodice);
+
+function mountWorkspace(me,a){
+  const view=$('#wsView'),canvas=$('#wsCanvas'),scale=$('#wsScale'),tray=$('#wsTray'),tpl=$('#wsTpl');
+  if(!view||!canvas||!scale||!tray)return;
+  const W=1123,H=794;let z=Math.min(1,Math.max(.3,(view.clientWidth-26)/W));let templateOn=true;let placed=[];let seq=0;let sel=null;
+  const FILLS=['none','rgba(232,161,28,.38)','rgba(46,84,240,.28)','rgba(188,90,40,.30)','rgba(30,126,110,.28)'];
+  function applyZoom(){canvas.style.width=(W*z)+'px';canvas.style.height=(H*z)+'px';scale.style.transform='scale('+z+')';const zl=$('#wsZoom');if(zl)zl.textContent=Math.round(z*100)+'%';}
+  function shapeFill(shape,fill){let s=SHAPE[shape]||SHAPE.bodice;if(fill&&fill!=='none')s=s.replace('fill="none"','fill="'+fill+'"');return s;}
+  function contentHTML(p){return p.desc.img?`<img src="${p.desc.img}" draggable="false" style="width:108px;height:auto">`:`<div style="width:84px">${shapeFill(p.desc.shape,p.fill)}</div>`;}
+  function applyTransform(p){const c=p.node.querySelector('.pcontent');c.style.transform=`rotate(${p.rot}deg) scaleX(${p.flipH*p.scale}) scaleY(${p.flipV*p.scale})`;if(p.desc.img)c.style.background=(p.fill&&p.fill!=='none')?p.fill:'transparent';}
+  const CTRL=`<div class="pctrl"><button data-op="flipH" title="Flip across">⤢</button><button data-op="flipV" title="Flip down">⇕</button><button data-op="rotL" title="Rotate left">⟲</button><button data-op="rotR" title="Rotate right">⟳</button><button data-op="down" title="Smaller">−</button><button data-op="up" title="Larger">+</button><button data-op="fill" title="Fill colour">◧</button><button data-op="copy" title="Duplicate">⧉</button><button data-op="del" class="rm" title="Delete">✕</button></div>`;
+  function render1(p){const node=document.createElement('div');node.className='ws-panel';node.style.left=p.x+'px';node.style.top=p.y+'px';node.style.zIndex=++seq;node.innerHTML=`<div class="pcontent">${contentHTML(p)}</div>${CTRL}`;scale.appendChild(node);p.node=node;applyTransform(p);
+    node.addEventListener('pointerdown',e=>{const btn=e.target.closest('button[data-op]');if(btn){e.stopPropagation();op(p,btn.dataset.op);return;}e.preventDefault();e.stopPropagation();select(p);startDrag(e,p);});}
+  function addPlaced(desc){const off=placed.length;const p={id:'wp'+(++seq),desc,x:36+(off%6)*26,y:36+Math.floor(off/6)*26,rot:0,flipH:1,flipV:1,scale:1,fill:'none'};placed.push(p);render1(p);select(p);}
+  function select(p){sel=p;placed.forEach(q=>q.node&&q.node.classList.toggle('selected',q===p));if(p.node)p.node.style.zIndex=++seq;}
+  function deselect(){sel=null;placed.forEach(q=>q.node&&q.node.classList.remove('selected'));}
+  function op(p,o){
+    if(o==='flipH')p.flipH*=-1; else if(o==='flipV')p.flipV*=-1;
+    else if(o==='rotL')p.rot-=15; else if(o==='rotR')p.rot+=15;
+    else if(o==='up')p.scale=Math.min(3,p.scale*1.15); else if(o==='down')p.scale=Math.max(.3,p.scale/1.15);
+    else if(o==='fill'){p.fill=FILLS[(FILLS.indexOf(p.fill)+1)%FILLS.length];if(!p.desc.img)p.node.querySelector('.pcontent').innerHTML=contentHTML(p);}
+    else if(o==='copy'){const np={desc:p.desc,x:p.x+18,y:p.y+18,rot:p.rot,flipH:p.flipH,flipV:p.flipV,scale:p.scale,fill:p.fill,id:'wp'+(++seq)};placed.push(np);render1(np);select(np);return;}
+    else if(o==='del'){p.node.remove();placed=placed.filter(q=>q!==p);if(sel===p)sel=null;return;}
+    applyTransform(p);
+  }
+  function startDrag(e,p){const sr=scale.getBoundingClientRect();const offX=(e.clientX-sr.left)/z-p.x,offY=(e.clientY-sr.top)/z-p.y;p.node.style.cursor='grabbing';
+    const mv=ev=>{const r=scale.getBoundingClientRect();let x=(ev.clientX-r.left)/z-offX,y=(ev.clientY-r.top)/z-offY;x=Math.max(-30,Math.min(W-20,x));y=Math.max(-30,Math.min(H-20,y));p.x=x;p.y=y;p.node.style.left=x+'px';p.node.style.top=y+'px';};
+    const up=()=>{document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);if(p.node)p.node.style.cursor='grab';};
+    document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up);}
+  function renderTray(){tray.innerHTML='';if(!(a.tray||[]).length){tray.innerHTML='<div class="emptray">No panels in this stack.</div>';return;}(a.tray||[]).forEach(d=>{const t=document.createElement('div');t.className='ptile';t.title='Click to add to the workspace';t.innerHTML=descVis(d)+`<span class="lb">${esc(d.label)}</span>`;t.addEventListener('click',()=>addPlaced(d));tray.appendChild(t);});}
+  scale.addEventListener('pointerdown',e=>{if(e.target===scale||e.target===tpl||e.target.closest('.ws-template'))deselect();});
+  const prev=(me.work&&me.work[a.stage]&&me.work[a.stage].placed)||[];
+  prev.forEach(pp=>{const d=(a.tray||[]).find(t=>t.label===pp.label&&t.from===pp.from)||{label:pp.label,from:pp.from,shape:'bodice'};const p={id:'wp'+(++seq),desc:d,x:pp.x,y:pp.y,rot:pp.rot||0,flipH:pp.flipH||1,flipV:pp.flipV||1,scale:pp.scale||1,fill:pp.fill||'none'};placed.push(p);render1(p);});
+  deselect();renderTray();applyZoom();
+  const tog=$('#wsTplToggle');if(tog)tog.addEventListener('click',()=>{templateOn=!templateOn;tpl.style.display=templateOn?'block':'none';tog.classList.toggle('on',templateOn);});
+  const zin=$('#wsZin');if(zin)zin.addEventListener('click',()=>{z=Math.min(2,z+.1);applyZoom();});
+  const zout=$('#wsZout');if(zout)zout.addEventListener('click',()=>{z=Math.max(.2,z-.1);applyZoom();});
+  const fit=$('#wsFit');if(fit)fit.addEventListener('click',()=>{z=Math.min(1,Math.max(.3,(view.clientWidth-26)/W));applyZoom();view.scrollTo(0,0);});
+  CUR_WS={save:()=>{me.work=me.work||{};me.work[a.stage]={tray:(a.tray||[]).map(d=>({label:d.label,from:d.from})),placed:placed.map(p=>({label:p.desc.label,from:p.desc.from,x:Math.round(p.x),y:Math.round(p.y),rot:p.rot,flipH:p.flipH,flipV:p.flipV,scale:Math.round(p.scale*100)/100,fill:p.fill})),templateOn,savedAt:new Date().toISOString()};}};
+}
+const PANEL_TOOL_URL='https://amalendhusp.github.io/Workshop-Plan-2026-draft/'; /* Panel Studio (index.html) on GitHub Pages */
+function panelDescs(a,g){return (a&&a.tray&&a.tray.length)?a.tray:descFromGarment(g);}
+function panelRefTiles(a,g){const ds=panelDescs(a,g);if(!ds.length)return '';return `<div class="mlabel" style="margin-top:16px">Panels provided <span class="faint">(${ds.length})</span></div><div class="preftiles">${ds.map(d=>`<div class="preftile">${descVis(d)}<span class="lb">${esc(d.label)}</span></div>`).join('')}</div>`;}
+function buildTaskFile(a,g){return {flatform_task:true,version:1,stage:a.stage,complexity:cxName(a.cx||(g?g.cx:'s')),garment:{id:g?g.id:null,name:g?g.name:'',type:g?g.type:'',image:g?(g.img||null):null,description:g?(g.desc||''):''},styleLine:a.line||null,template:'A4-landscape',panels:panelDescs(a,g).map(d=>({label:d.label,from:d.from||null,shape:d.shape||null,image:d.img||null})),exportedAt:new Date().toISOString()};}
+function downloadJSON(obj,name){downloadBlob(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),name);}
+
+// ════════════════════════════════════════
+//  CONSOLE STATE — SAVE / OPEN
+//  The console has no backend at all — garments, tasks, basic panels and
+//  participants exist only in this tab's memory. A refresh, crash, or
+//  closed tab loses everything. This saves/restores the full state.
+// ════════════════════════════════════════
+let currentConsoleFileHandle = null;
+let currentConsoleFileName = null;
+
+function buildConsoleStatePayload(){
+  return {
+    flatform_console_state: true,
+    version: 1,
+    savedAt: new Date().toISOString(),
+    garments: GARMENTS,
+    tasks: TASKS,
+    basicPanels: BASIC_PANELS,
+    participants: PARTICIPANTS,
+    seq: { garment: GARMENT_SEQ, task: TASK_SEQ },
+    importedPackages: S.importedPackages,
+  };
+}
+
+async function saveConsoleState(){
+  let json;
+  try { json = JSON.stringify(buildConsoleStatePayload()); }
+  catch(e){ alert('Could not save: '+e.message); return; }
+
+  // Prefer TRUE in-place overwrite where the browser supports it (Chrome,
+  // Edge) — first Save asks where to save once, every Save after that
+  // writes straight back to that same file.
+  if (window.showSaveFilePicker) {
+    try {
+      if (!currentConsoleFileHandle) {
+        currentConsoleFileHandle = await window.showSaveFilePicker({
+          suggestedName: currentConsoleFileName || ('workshop-console-state-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.json'),
+          types: [{ description: 'Workshop Console state', accept: {'application/json': ['.json']} }]
+        });
+      }
+      const writable = await currentConsoleFileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      currentConsoleFileName = currentConsoleFileHandle.name;
+      toast('Saved to "'+currentConsoleFileName+'" — Save again to update the same file');
+      return;
+    } catch(err) {
+      if (err && err.name === 'AbortError') return;
+      console.error(err); // fall through to the download fallback
+    }
+  }
+
+  // Fallback for browsers without the File System Access API (Safari,
+  // Firefox) — reuse the same filename every time so it's at least
+  // consistent; whether that replaces the previous download or adds "(1)"
+  // is controlled by your browser's own download settings.
+  const name = currentConsoleFileName || ('workshop-console-state-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.json');
+  currentConsoleFileName = name;
+  const blob = new Blob([json], {type:'application/json'});
+  const reader = new FileReader();
+  reader.onload = function(){
+    const a=document.createElement('a');
+    a.href=reader.result; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Saved as "'+name+'" — your browser controls whether this replaces the previous download or adds a copy');
+  };
+  reader.onerror = function(){ alert('Could not save (file read failed).'); };
+  reader.readAsDataURL(blob);
+}
+
+function openConsoleState(input){
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch(e){ alert('This does not look like a valid Workshop Console state file.'); input.value=''; return; }
+    if (!data || !data.flatform_console_state) {
+      alert('This does not look like a Workshop Console state file (saved with the Save button).');
+      input.value=''; return;
+    }
+    GARMENTS.length=0; if(Array.isArray(data.garments)) GARMENTS.push(...data.garments);
+    TASKS.length=0; if(Array.isArray(data.tasks)) TASKS.push(...data.tasks);
+    PARTICIPANTS.length=0; if(Array.isArray(data.participants)) PARTICIPANTS.push(...data.participants);
+    BASIC_PANELS = Array.isArray(data.basicPanels) ? data.basicPanels : [];
+    if(data.seq){ if(data.seq.garment) GARMENT_SEQ=data.seq.garment; if(data.seq.task) TASK_SEQ=data.seq.task; }
+    S.importedPackages = (data.importedPackages && typeof data.importedPackages==='object') ? data.importedPackages : {};
+    currentConsoleFileName = f.name;
+    currentConsoleFileHandle = null; // opened via classic picker — no live handle to write back to
+    render();
+    toast('Console state loaded — Save will update "'+f.name+'"');
+    input.value = '';
+  };
+  reader.onerror = function(){ alert('Could not read that file.'); input.value=''; };
+  reader.readAsText(f);
+}
+function importParticipantPackage(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(e){ alert('This does not look like a valid participant package file.'); input.value=''; return; }
+    if(!data || !data.flatform_participant_package || !data.stages){
+      alert('This does not look like a Flat⇄Form participant package (saved/sent back from the Participant page).');
+      input.value=''; return;
+    }
+    const code = (data.participant && (data.participant.code || data.participant.id)) || null;
+    if(!code){ alert('This file has no participant code — cannot match it to a participant record.'); input.value=''; return; }
+    const known = S.participants.find(p=>(p.code||p.id)===code);
+    if(!known){ alert('No participant with code "'+code+'" found in this console — add them first, or check the file.'); input.value=''; return; }
+    if(!S.importedPackages) S.importedPackages = {};
+    S.importedPackages[code] = { data, importedAt:new Date().toISOString(), fileName:f.name };
+    render();
+    toast('Imported '+known.name+'\'s returned file ("'+f.name+'")');
+    input.value = '';
+  };
+  reader.onerror = function(){ alert('Could not read that file.'); input.value=''; };
+  reader.readAsText(f);
+}
+// ── Operational metrics, derived from an imported package's sessions/syncLog.
+// Malformed or incomplete records (missing required fields, unparsable
+// timestamps) are silently excluded from the relevant calculation rather
+// than counted as failures — a genuine snapshot_timeout/snapshot_error/
+// restore_error event is a real signal and still counts; a structurally
+// broken record is not a signal at all. ──
+function computeOperationalMetrics(code){
+  const entry = S.importedPackages && S.importedPackages[code];
+  if(!entry) return null;
+  const data = entry.data || {};
+  const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+  const syncLog = Array.isArray(data.syncLog) ? data.syncLog : [];
+
+  const validSessions = sessions.filter(s=>s && typeof s.startedAt==='string');
+  const closedSessions = validSessions.filter(s=>typeof s.endedAt==='string');
+  const durationsMs = closedSessions
+    .map(s=>new Date(s.endedAt).getTime()-new Date(s.startedAt).getTime())
+    .filter(ms=>Number.isFinite(ms) && ms>=0);
+  const totalDurationMs = durationsMs.reduce((a,b)=>a+b,0);
+  const avgDurationMs = durationsMs.length ? totalDurationMs/durationsMs.length : null;
+  const reasonCounts = {pause:0, completed:0, replaced:0};
+  closedSessions.forEach(s=>{ if(s.endedReason && reasonCounts.hasOwnProperty(s.endedReason)) reasonCounts[s.endedReason]++; });
+
+  const sorted = [...validSessions].sort((a,b)=>new Date(a.startedAt)-new Date(b.startedAt));
+  const gapsMs = [];
+  for(let i=1;i<sorted.length;i++){
+    if(typeof sorted[i-1].endedAt !== 'string') continue;
+    const gap = new Date(sorted[i].startedAt).getTime() - new Date(sorted[i-1].endedAt).getTime();
+    if(Number.isFinite(gap) && gap>=0) gapsMs.push(gap);
+  }
+
+  const validSync = syncLog.filter(e=>e && typeof e.type==='string');
+  const rawCounts = {};
+  validSync.forEach(e=>{ rawCounts[e.type] = (rawCounts[e.type]||0)+1; });
+  const snapshotSucceeded = rawCounts.snapshot_applied||0;
+  const snapshotAttempts = snapshotSucceeded + (rawCounts.snapshot_timeout||0) + (rawCounts.snapshot_error||0);
+  const restoreSucceeded = rawCounts.restore_sent||0;
+  const restoreAttempts = restoreSucceeded + (rawCounts.restore_error||0);
+
+  return {
+    fileName: entry.fileName, importedAt: entry.importedAt,
+    sessionCount: validSessions.length, closedSessionCount: closedSessions.length,
+    openSessionCount: validSessions.length - closedSessions.length,
+    totalDurationMs, avgDurationMs, reasonCounts,
+    longestGapMs: gapsMs.length ? Math.max(...gapsMs) : null,
+    sync: { snapshotAttempts, snapshotSucceeded, restoreAttempts, restoreSucceeded, rawCounts },
+  };
+}
+function fmtDuration(ms){
+  if(ms==null) return '—';
+  const mins = Math.round(ms/60000);
+  if(mins<60) return mins+'m';
+  return Math.floor(mins/60)+'h '+(mins%60)+'m';
+}
+function operationalMetricsHTML(code){
+  const m = computeOperationalMetrics(code);
+  if(!m) return `<div class="mlabel" style="margin-top:14px">Session &amp; sync data</div><div class="faint" style="padding:8px 0">No returned file imported yet — use "Import participant's returned file" above.</div>`;
+  const statusLabel = m.reasonCounts.completed>0 ? 'completed' : (m.openSessionCount>0 ? 'in progress' : 'paused, not yet finished');
+  const gapNote = m.longestGapMs ? `Longest break between sessions: ${fmtDuration(m.longestGapMs)}` : '';
+  const failedSnapshots = m.sync.snapshotAttempts - m.sync.snapshotSucceeded;
+  const syncNote = m.sync.snapshotAttempts===0 ? '' :
+    (failedSnapshots===0 ? 'Design tool connection: reliable throughout.' : `Design tool connection: ${failedSnapshots} of ${m.sync.snapshotAttempts} save attempts had trouble.`);
+  return `<div class="mlabel" style="margin-top:14px">Session &amp; sync data</div>
+    <div class="saved" style="margin-top:6px">
+      <div>${m.sessionCount} session${m.sessionCount===1?'':'s'} · total time ${fmtDuration(m.totalDurationMs)} · ${statusLabel}</div>
+      ${gapNote?`<div class="faint" style="margin-top:4px">${gapNote}</div>`:''}
+      ${syncNote?`<div class="faint" style="margin-top:4px">${syncNote}</div>`:''}
+      <div class="faint mono" style="font-size:11px;margin-top:6px">from "${esc(m.fileName)}" · imported ${new Date(m.importedAt).toLocaleString()}</div>
+    </div>
+    <details style="margin-top:8px"><summary class="faint mono" style="font-size:11px;cursor:pointer">Technical details</summary>
+      <div class="mono faint" style="font-size:11px;margin-top:6px;line-height:1.6">
+        sessions: ${m.sessionCount} (closed ${m.closedSessionCount}, open ${m.openSessionCount})<br>
+        ended reasons: pause ${m.reasonCounts.pause}, completed ${m.reasonCounts.completed}, replaced ${m.reasonCounts.replaced}<br>
+        sync events: ${Object.entries(m.sync.rawCounts).map(([k,v])=>k+':'+v).join(', ')||'none'}
+      </div>
+    </details>`;
+}
+function uploadsBlock(me,a){const ups=(me.work&&me.work[a.stage]&&me.work[a.stage].uploads)||[];
+  const chips=ups.map((u,i)=>`<div class="upchip">${u.type&&u.type.startsWith('image/')?`<img src="${u.dataUrl}">`:`<span class="fic">${ICON.layers}</span>`}<span class="un">${esc(u.name)}</span><button class="rmup" data-act="rmUpload" data-i="${i}" title="remove">✕</button></div>`).join('');
+  return `<div class="mlabel" style="margin-top:20px">Upload your solution ${ups.length?`<span class="faint">(${ups.length})</span>`:''}</div>
+    <div class="uploadzone"><input type="file" id="solUpload" multiple accept="image/*,.json,.svg,.png,.jpg,.jpeg,.zip,.pdf">
+    <div class="faint mono" style="font-size:11px;margin-top:8px">${uploadNote(a.stage)}</div>
+    ${ups.length?`<div class="upchips">${chips}</div>`:''}</div>`;}
+const SCAFFOLD_SLOTS={
+  s2:[{key:'garment',label:'Garment image'},{key:'arranged',label:'Arranged panels image (for print / Clo3D)'}],
+  s3:[{key:'styleline',label:'Garment with proposed style line'},{key:'arranged',label:'Arranged panel list'}],
+};
+function uploadNote(stage){return stage==='s2'?'photos or Clo3D screenshots of the garment you constructed — you can add several'
+  :stage==='s3'?'your drawn panel exported from Panel Studio, plus 3–4 verification photos or Clo3D screenshots'
+  :'the file you exported from Panel Studio, or a photo of your work — you can add more than one';}
+function stageHowto(a){
+  const dl=`<div class="row" style="margin-top:11px"><button class="btn ghost sm" data-act="dlTaskFile">⤓ Download task file</button>${PANEL_TOOL_URL?`<a class="btn ghost sm" href="${PANEL_TOOL_URL}" target="_blank" rel="noopener">Open Panel Studio ↗</a>`:'<span class="faint mono" style="font-size:11px">open Panel Studio separately</span>'}</div>`;
+  if(a.stage==='s2')return `<div class="hintbox"><div class="ht">How to complete this task</div><ol style="margin:6px 0 0;padding-left:20px"><li>Use the <b>garment image</b> and the <b>arranged panels image</b> provided above.</li><li>Take a print, or import the arranged panels into Clo3D, and construct the garment.</li><li>Photograph your construction (or screenshot Clo3D) and upload the images under <b>Upload your solution</b>.</li></ol></div>`;
+  if(a.stage==='s3')return `<div class="hintbox"><div class="ht">How to complete this task</div><ol style="margin:6px 0 0;padding-left:20px"><li>Study the <b>garment with the proposed style line</b> above and imagine the shape of the single cut panel.</li><li>Draw that panel in Panel Studio and export it — or use the provided <b>arranged panel list</b> as a scaffold to build from.</li><li>To verify: take a print or use Clo3D to construct the panel, then upload 3–4 photos / screenshots under <b>Upload your solution</b>.</li></ol>${dl}</div>`;
+  return `<div class="hintbox"><div class="ht">How to complete this task</div><ol style="margin:6px 0 0;padding-left:20px"><li>Download the task file and open it in Panel Studio.</li><li>Build your solution there (select, arrange, flip, rotate, fill, trace…).</li><li>Export it from that tool, then upload the exported file under <b>Upload your solution</b>.</li></ol>${dl}</div>`;
+}
+function scaffoldsView(me,a){
+  const slots=SCAFFOLD_SLOTS[a.stage]||[];if(!slots.length)return '';
+  const sc=(me.work&&me.work[a.stage]&&me.work[a.stage].scaffolds)||{};
+  const items=slots.map(s=>{const f=sc[s.key];return `<div class="scfitem"><div class="scfrole">${s.label}</div>${f?`<a href="${f.dataUrl}" download="${esc(f.name)}" title="download">${f.type&&f.type.startsWith('image/')?`<img src="${f.dataUrl}">`:`<span class="filelink">⤓ ${esc(f.name)}</span>`}</a>`:`<div class="scfmissing">waiting for the researcher to provide this…</div>`}</div>`;}).join('');
+  return `<div class="mlabel" style="margin-top:16px">Scaffold provided</div><div class="scfgrid">${items}</div>`;
+}
+function workHTML(p){
+  if(!p.work||!Object.keys(p.work).length)return '';
+  const blocks=Object.keys(p.work).map(stg=>{const w=p.work[stg];const tray=w.tray||[];const ups=w.uploads||[];const scKeys=w.scaffolds?Object.keys(w.scaffolds):[];
+    const upitems=ups.map(u=>u.type&&u.type.startsWith('image/')?`<a href="${u.dataUrl}" download="${esc(u.name)}" title="${esc(u.name)}"><img src="${u.dataUrl}" style="height:80px;border:1px solid var(--line);border-radius:8px;object-fit:contain;margin:4px;background:var(--card)"></a>`:`<a href="${u.dataUrl}" download="${esc(u.name)}" class="filelink">⤓ ${esc(u.name)}</a>`).join('');
+    return `<details style="border:1px solid var(--line);border-radius:10px;background:var(--paper-2);margin-bottom:8px;padding:0 12px"><summary style="cursor:pointer;padding:11px 0;font-family:'Bricolage Grotesque';font-weight:700;font-size:14px">${stg.toUpperCase()} · ${ups.length} solution file${ups.length===1?'':'s'} uploaded</summary>
+      <div style="padding-bottom:10px;font-size:13.5px"><div class="mono" style="font-size:11px;color:var(--ink-faint);margin-bottom:4px">panel stack presented (${tray.length})</div>${tray.map(t=>esc(t.label)+(t.from?` <span class="faint">· ${esc(t.from)}</span>`:'')).join(', ')||'—'}
+      ${scKeys.length?`<div class="mono" style="font-size:11px;color:var(--ink-faint);margin:10px 0 4px">researcher scaffold</div><div class="row" style="flex-wrap:wrap;gap:4px">${scKeys.map(k=>{const f=w.scaffolds[k];return f.type&&f.type.startsWith('image/')?`<a href="${f.dataUrl}" download="${esc(f.name)}" title="${esc(f.label||k)}"><img src="${f.dataUrl}" style="height:70px;border:1px solid var(--line);border-radius:8px;object-fit:contain;margin:4px;background:var(--card)"></a>`:`<a href="${f.dataUrl}" download="${esc(f.name)}" class="filelink">${esc(f.label||k)}</a>`;}).join('')}</div>`:''}
+      <div class="mono" style="font-size:11px;color:var(--ink-faint);margin:10px 0 4px">uploaded solution</div><div class="row" style="flex-wrap:wrap;gap:4px">${ups.length?upitems:'<span class="faint">Nothing uploaded yet.</span>'}</div></div></details>`;
+  }).join('');
+  return `<div class="mlabel" style="margin-top:14px">Solutions &amp; panel stacks</div><div style="margin-top:6px">${blocks}</div>`;
+}
+
+/* ---- data export (foldered) ---- */
+function csvCell(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function dataUrlParts(d){const m=/^data:([^;]+);base64,(.*)$/.exec(d||'');if(!m)return null;let ext=(m[1].split('/')[1]||'png');ext=ext.replace('jpeg','jpg').replace('svg+xml','svg');return{ext,b64:m[2]};}
+function downloadBlob(blob,name){
+  // Use a data: URI instead of a blob: URL. blob: URLs are tied to the page's
+  // origin — in a sandboxed preview or a file:// context that origin is "null",
+  // and Safari can't navigate/download blob:null/... URLs at all; it instead
+  // tries to open the blob URL as a real page, fails, and replaces the whole
+  // tab with an error page (wiping out all in-memory state). data: URIs have
+  // no such origin dependency and work the same everywhere.
+  const reader = new FileReader();
+  reader.onload = function(){
+    const a=document.createElement('a');
+    a.href=reader.result; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  reader.onerror = function(){
+    // Fallback: original blob-URL approach, in case data: URL reading fails for some reason
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  };
+  reader.readAsDataURL(blob);
+}
+function collectExport(){
+  const files=[];
+  const pcsv=[['code','name','email','phone','detail','mode','consent','recording','age','background','phases_done']]
+    .concat(S.participants.map(p=>[p.code||p.id,p.name||'',p.email||'',p.phone||'',p.detail||'',p.mode,p.consent.given?'yes':'no',p.consent.recording||'',p.consent.age||'',p.consent.bg||'',phaseDoneCount(p)]))
+    .map(r=>r.map(csvCell).join(',')).join('\n');
+  files.push({path:'participants.csv',content:pcsv});
+  const tcsv=[['task_id','stage','complexity','garment','style_line']]
+    .concat(TASKS.map(t=>{const g=garment(t.garmentId);return [t.id,t.stage,cxName(t.cx),g?g.name:'',t.line||''];}))
+    .map(r=>r.map(csvCell).join(',')).join('\n');
+  files.push({path:'tasks.csv',content:tcsv});
+  S.participants.forEach(p=>{const base=p.code||p.id;
+    files.push({path:`${base}/profile.json`,content:JSON.stringify({id:p.id,code:p.code,name:p.name,email:p.email,phone:p.phone,detail:p.detail,mode:p.mode},null,2)});
+    files.push({path:`${base}/consent.json`,content:JSON.stringify(p.consent,null,2)});
+    files.push({path:`${base}/progress.json`,content:JSON.stringify(p.progress,null,2)});
+    if(p.findings)files.push({path:`${base}/findings.txt`,content:p.findings});
+    ['prompts','interviews','surveys'].forEach(map=>{if(p[map])Object.keys(p[map]).forEach(stg=>files.push({path:`${base}/${map}/${stg}-${map.slice(0,-1)}.json`,content:JSON.stringify(p[map][stg],null,2)}));});
+    if(p.work)Object.keys(p.work).forEach(stg=>{const w=p.work[stg];
+      files.push({path:`${base}/work/${stg}.json`,content:JSON.stringify({tray:w.tray||[],uploads:(w.uploads||[]).map(u=>u.name),presentedAt:w.presentedAt||null},null,2)});
+      (w.uploads||[]).forEach((u,i)=>{const dp=dataUrlParts(u.dataUrl);const safe=(u.name||('file-'+(i+1))).replace(/[^\w.\-]+/g,'_');if(dp)files.push({path:`${base}/solutions/${stg}/${safe.match(/\.[a-z0-9]+$/i)?safe:safe+'.'+dp.ext}`,content:dp.b64,base64:true});});
+      Object.keys(w.scaffolds||{}).forEach(k=>{const f=w.scaffolds[k];const dp=dataUrlParts(f.dataUrl);if(dp)files.push({path:`${base}/scaffolds/${stg}/${k}.${dp.ext}`,content:dp.b64,base64:true});});
+    });
+  });
+  // flat responses CSV across everyone (all instruments)
+  const srows=[['participant_code','stage','instrument','question','type','answer']];
+  S.participants.forEach(p=>{[['prompts','think-aloud'],['surveys','survey'],['interviews','interview']].forEach(([map,label])=>{if(p[map])Object.keys(p[map]).forEach(stg=>{const rec=p[map][stg];if(rec.responses){rec.responses.forEach(r=>{srows.push([p.code||p.id,stg,label,r.q,r.type,Array.isArray(r.answer)?r.answer.join('; '):(r.answer==null?'':r.answer)]);});}else{srows.push([p.code||p.id,stg,label,'(researcher-led, conducted)','notes',rec.notes||'']);}});});});
+  if(srows.length>1)files.push({path:'responses.csv',content:srows.map(r=>r.map(csvCell).join(',')).join('\n')});
+  S.garments.forEach(g=>{const base=`garments/${g.id}`;
+    files.push({path:`${base}/meta.json`,content:JSON.stringify({id:g.id,name:g.name,type:g.type,complexity:cxName(g.cx),stages:g.stages||[],description:g.desc||'',panelCount:(g.panelImgs?g.panelImgs.length:(g.panels?g.panels.length:0))},null,2)});
+    const gi=dataUrlParts(g.img);if(gi)files.push({path:`${base}/garment.${gi.ext}`,content:gi.b64,base64:true});
+    (g.panelImgs||[]).forEach((d,i)=>{const pi=dataUrlParts(d);if(pi)files.push({path:`${base}/panel-${i+1}.${pi.ext}`,content:pi.b64,base64:true});});
+  });
+  files.push({path:'README.txt',content:`Workshop Console (Flat ↔ Form) — research data export\nGenerated ${new Date().toString()}\n\nfolders:\n  <code>/   one per participant (profile, consent, progress, findings)\n  garments/ one per garment (meta + uploaded images)\n  participants.csv, tasks.csv  summaries`});
+  return files;
+}
+async function exportZip(){
+  if(!window.JSZip){toast('Zip library not available (offline?)');return;}
+  toast('Building data export…');
+  const zip=new JSZip();
+  collectExport().forEach(f=>zip.file('flat-form-export/'+f.path,f.content,f.base64?{base64:true}:undefined));
+  const blob=await zip.generateAsync({type:'blob'});
+  downloadBlob(blob,'flat-form-export.zip');
+  toast('Export downloaded (.zip)');
+}
+async function writeToDir(dirHandle,path,content,base64){
+  const parts=path.split('/');const name=parts.pop();let d=dirHandle;
+  for(const seg of parts){d=await d.getDirectoryHandle(seg,{create:true});}
+  const fh=await d.getFileHandle(name,{create:true});const w=await fh.createWritable();
+  if(base64){const bin=atob(content);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);await w.write(arr);}else{await w.write(content);}
+  await w.close();
+}
+async function exportFolder(){
+  if(!window.showDirectoryPicker){toast('Folder save needs Chrome or Edge');return;}
+  let dir;try{dir=await window.showDirectoryPicker({mode:'readwrite'});}catch(e){return;}
+  try{const files=collectExport();for(const f of files){await writeToDir(dir,f.path,f.content,f.base64);}toast('Saved into the chosen folder');}
+  catch(e){toast('Could not write to folder: '+e.message);}
+}
+function contactHTML(p){return `<div class="mlabel" style="margin-top:6px">Contact details</div>
+  <div class="saved" style="margin-top:6px;font-family:'JetBrains Mono';font-size:12px;line-height:1.7">name: <b>${p.name||'—'}</b> · code: <b>${p.code||p.id}</b><br>email: ${p.email||'—'} · phone: ${p.phone||'—'}</div>`;}
+function tasksActivitiesHTML(p){
+  const rowsC=[['Pre-test','pretest',null,'pretest_survey',null],['Stage 1','s1_task','s1_prompt','s1_survey','s1_interview'],
+    ['Stage 2','s2_task','s2_prompt','s2_survey','s2_interview'],['Stage 3','s3_task','s3_prompt','s3_survey','s3_interview'],
+    ['Post-test','posttest',null,'posttest_survey',null]];
+  const sd=k=> k===null?'<span class="faint">—</span>':(p.progress[k]==='done'?'<span class="cell done"></span>':p.progress[k]==='active'?'<span class="cell active"></span>':'<span class="cell"></span>');
+  const body=rowsC.map(r=>`<tr><td class="name" style="text-align:left">${r[0]}</td><td>${sd(r[1])}</td><td>${sd(r[2])}</td><td>${sd(r[3])}</td><td>${sd(r[4])}</td></tr>`).join('');
+  return `<div class="mlabel" style="margin-top:14px">Tasks allocated &amp; activities</div>
+    <div class="saved" style="margin:6px 0 8px;padding:10px 12px"><span class="mono" style="font-size:12px">Activity · Consent —</span> ${p.consent.given?`<span class="tag ok">given · rec ${p.consent.recording}</span>`:'<span class="tag wait">not given</span>'}</div>
+    <div class="matrix"><table class="mx"><thead><tr><th style="text-align:left">Task allocated</th><th>Task</th><th>Prompt-reflection</th><th>Survey</th><th>Interview</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function renderWho(){
+  const box=$('#whoBox');
+  if(S.perspective==='participant'){
+    if(!S.curUser){box.innerHTML='';return;}
+    const opts=S.participants.map(p=>`<option value="${p.id}" ${S.curUser===p.id?'selected':''}>${p.name} · ${p.id}</option>`).join('');
+    box.innerHTML=`logged in&nbsp;<select id="userSel"><option value="">— sign out —</option>${opts}</select>`;
+    const sel=$('#userSel');if(sel)sel.onchange=e=>{S.curUser=e.target.value||null;S.pstage='task';render();};
+  } else {
+    const n=notifyCount();
+    box.innerHTML=`<span class="cx" style="border-color:${n?'var(--hi)':'var(--line)'}"><i style="background:${n?'var(--hi)':'var(--ink-faint)'}"></i>${n} awaiting action</span>`;
+  }
+}
+
+const ICON={
+  people:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6a3 3 0 0 1 0 6M21 20a6 6 0 0 0-4-5.6"/></svg>',
+  grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  play:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6v18h12V8z"/><path d="M14 3v5h4"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  layers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>'
+};
+function navItem(key,label,icon,badge){return `<button data-tab="${key}" class="${S.rtab===key?'on':''}"><span class="ic">${icon}</span>${label}${badge?`<span class="badge">${badge}</span>`:''}</button>`;}
+function researcherShell(inner){return `<div class="shell"><nav class="side"><div class="nh">Console</div>
+  ${navItem('participants','Participants',ICON.people,notifyCount()||'')}
+  ${navItem('tasks','Stages &amp; tasks',ICON.grid)}
+  ${navItem('assign','Assign &amp; activate',ICON.play)}
+  ${navItem('package','Package &amp; send',ICON.play)}
+  ${navItem('analysis','Data &amp; analysis',ICON.chart)}
+  <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px">
+    <button class="btn ghost sm" style="justify-content:center" onclick="saveConsoleState()" title="Save everything — garments, tasks, basic panels, participants — to a file">💾 Save</button>
+    <button class="btn ghost sm" style="justify-content:center" onclick="document.getElementById('consoleStateInput').click()" title="Load a previously saved console state">📂 Open</button>
+    <input type="file" id="consoleStateInput" accept="application/json,.json" style="display:none" onchange="openConsoleState(this)">
+  </div>
+  </nav><main class="view">${inner}</main></div>`;}
+function stripHTML(p){return '<div class="strip">'+PHASES.map(ph=>ph.divider?'<span class="seg divider"></span>':`<span class="seg ${p.progress[ph.key]}" title="${ph.key}">${ph.label}</span>`).join('')+'</div>';}
+
+function tabParticipants(){
+  const addForm = S.addP?`<div class="card" style="margin-bottom:12px;border-color:var(--ink)">
+    <div class="row" style="justify-content:space-between"><div class="disp" style="font-size:17px">Add a participant</div><button class="btn ghost sm" data-act="cancelAddP">Cancel</button></div>
+    <div class="grid g2" style="margin-top:12px">
+      <div class="form-field"><label class="q">Full name</label><input class="txt" id="apName" placeholder="Participant name"/></div>
+      <div class="form-field"><label class="q">Pseudoname / code <span class="req">required</span></label><input class="txt" id="apCode" value="${nextCode()}"/></div>
+      <div class="form-field"><label class="q">Email</label><input class="txt" id="apEmail" placeholder="name@example.com"/></div>
+      <div class="form-field"><label class="q">Phone</label><input class="txt" id="apPhone" placeholder="+91 …"/></div>
+    </div>
+    <button class="btn blue" style="margin-top:14px" data-act="submitAddP">Add participant</button>
+    <div class="faint mono" style="font-size:11px;margin-top:8px">The participant will sign in with this code, then complete consent before any task runs.</div>
+  </div>`:'';
+  const rows=S.participants.map(p=>{
+    const done=phaseDoneCount(p),total=PHASE_KEYS.length;
+    const consent=p.consent.given?`<span class="tag ok">consent ✓ · rec ${p.consent.recording}</span>`:`<span class="tag wait">awaiting consent</span>`;
+    const act=p.notify?`<button class="btn sm blue" data-act="recordFindings" data-id="${p.id}">Record findings</button>`
+      :p.active?`<span class="tag dig">live · ${p.active.stage.toUpperCase()} ${cxName(p.active.cx||garment(p.active.garmentId).cx).slice(0,3)}</span>`
+      :`<button class="btn sm ghost" data-act="goAssign" data-id="${p.id}">Assign next ▸</button>`;
+    return `<div class="prow">
+      <div><div class="pname" data-act="openP" data-id="${p.id}" style="cursor:pointer"><span class="dotn ${p.notify?'notify':''}"></span>${p.name}</div>
+        <div class="pid">${p.code||p.id} · ${p.detail} · <span class="tag ${p.mode==='physical'?'phys':'dig'}" style="font-size:9px">${p.mode}</span></div>
+        <div class="pid" style="margin-top:3px">${p.email||'—'}${p.phone?' · '+p.phone:''}</div>
+        <div style="margin-top:6px">${consent}</div></div>
+      <div>${stripHTML(p)}<div class="pid" style="margin-top:6px">${done}/${total} phases · <a href="#" data-act="openP" data-id="${p.id}" style="color:var(--digital-ink)">open ▸</a> · <a href="#" data-act="openArts" data-id="${p.id}" style="color:var(--digital-ink)">${p.arts} artefacts ▸</a></div></div>
+      <div class="row" style="justify-content:flex-end">${act}</div></div>`;
+  }).join('');
+  return `<div class="page-head"><div class="k">Console · participants</div><h2>Participants &amp; progress</h2>
+    <p>Each participant carries contact details, a set of <b>tasks allocated</b> (pre-test · three stages · post-test) and the <b>activities</b> within them (consent · prompt-reflection · survey · interview). A pulsing marker means they're waiting on you.</p></div>
+    <div class="row" style="margin-bottom:12px"><span class="mlabel">${S.participants.length} participants</span><span class="spacer"></span><button class="btn" data-act="showAddP">+ Add participant</button></div>
+    ${addForm}
+    <div class="card" style="padding:6px 18px">${rows}</div>`;
+}
+
+function taskForm(){
+  const d=S.addTData;
+  const cxs=[['s','Simple'],['m','Moderate'],['c','Complex']].map(([k,l])=>`<button data-act="setTCx" data-k="${k}" class="${d.cx===k?'on':''}">${l}</button>`).join('');
+  const stageOpts=[['pretest','Pre-test'],['s1','Stage 1'],['s2','Stage 2'],['s3','Stage 3'],['posttest','Post-test']];
+  const stageChips=stageOpts.map(([k,l])=>`<span class="chk ${d.stages[k]?'on':''}" data-act="toggleStage" data-k="${k}"><span class="bx"></span>${l}</span>`).join('');
+  const types=['Tunic','Dress','Shirt','Top','Skirt','Trousers','Jacket','Blazer','Kurta','Saree blouse'];
+  const imgPreview=(src,label)=>src?`<img src="${src}" style="height:90px;border-radius:8px;object-fit:contain;border:1px solid var(--line)"/>`:`<div class="faint mono" style="font-size:11px;margin-top:4px">no ${label} yet</div>`;
+  const pimgs=d.panelImgs.length?`<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">${d.panelImgs.map(p=>`<img src="${p}" style="height:52px;border-radius:6px;border:1px solid var(--line);object-fit:contain"/>`).join('')}<button class="btn ghost sm" data-act="clearPanels">clear</button></div>`:`<div class="faint mono" style="font-size:11px;margin-top:6px">no panel images yet</div>`;
+  const solStatus=d.solutionFile?`<div class="mono faint" style="font-size:11px;margin-top:6px">✓ ${esc(d.solutionFileName||'solution file attached')}</div>`:`<div class="faint mono" style="font-size:11px;margin-top:6px">no solution file yet</div>`;
+  const scaffoldStatus=d.arrangementScaffold?`<img src="${d.arrangementScaffold}" style="height:90px;border-radius:8px;object-fit:contain;border:1px solid var(--line);margin-top:6px"/>`:`<div class="faint mono" style="font-size:11px;margin-top:6px">no arrangement scaffold yet</div>`;
+  const isEdit = !!S.editingGarmentId;
+  return `<div class="card" style="margin-bottom:16px;border-color:var(--ink)">
+    <div class="row" style="justify-content:space-between"><div class="disp" style="font-size:17px">${isEdit?'Edit garment':'Add a garment'}</div><button class="btn ghost sm" data-act="cancelAddT">Cancel</button></div>
+    <div class="grid g2" style="margin-top:12px">
+      <div class="form-field"><label class="q">Garment name <span class="req">required</span></label><input class="txt" id="atName" value="${esc(d.name)}" placeholder="e.g. Green Faux Leather Jacket"/></div>
+      <div class="form-field"><label class="q">Garment type</label><input class="txt" id="atType" list="typeList" value="${esc(d.type)}" placeholder="e.g. Jacket"/><datalist id="typeList">${types.map(t=>`<option value="${t}">`).join('')}</datalist></div>
+    </div>
+    <div class="mlabel" style="margin-top:8px">Complexity</div><div class="modepick" style="margin-top:8px">${cxs}</div>
+    <div class="mlabel" style="margin-top:16px">Stages it can be used in <span class="faint">(one or more — includes pre/post-test)</span></div>
+    <div class="checks" style="margin-top:8px">${stageChips}</div>
+
+    <div class="mlabel" style="margin-top:18px">Reference images <span class="faint">(shown to the participant as scaffolding — pre-test, post-test, and Stage 2's construction reference)</span></div>
+    <div class="grid g3" style="margin-top:8px">
+      <div class="form-field"><label class="q">Full garment</label><input type="file" id="atFullImg" accept="image/*,.svg" class="txt" style="padding:9px"/><div>${imgPreview(d.fullImg,'full garment image')}</div></div>
+      <div class="form-field"><label class="q">Front &amp; back</label><input type="file" id="atFBImg" accept="image/*,.svg" class="txt" style="padding:9px"/><div>${imgPreview(d.frontBackImg,'front/back image')}</div></div>
+      <div class="form-field"><label class="q">Flat sketch</label><input type="file" id="atFlatImg" accept="image/*,.svg" class="txt" style="padding:9px"/><div>${imgPreview(d.flatSketchImg,'flat sketch')}</div></div>
+    </div>
+
+    <div class="grid g2" style="margin-top:14px">
+      <div class="form-field"><label class="q">Individual panel shapes <span class="faint">(Stage 1 panel library — upload more than one)</span></label><input type="file" id="atPImgs" accept="image/*,.svg" multiple class="txt" style="padding:9px"/>${pimgs}</div>
+      <div class="form-field"><label class="q">Researcher's solution file <span class="faint">(PDF — panel arrangement, ready to display as shapes and import into Clo3D)</span></label><input type="file" id="atSolution" accept="application/pdf,.pdf" class="txt" style="padding:9px"/>${solStatus}</div>
+    </div>
+    <div class="form-field" style="margin-top:14px"><label class="q">Panel arrangement scaffold <span class="faint">(PNG — shown directly in the Panel Studio workspace as a reference, separate from the solution file above)</span></label><input type="file" id="atArrangementScaffold" accept="image/*" class="txt" style="padding:9px"/>${scaffoldStatus}</div>
+
+    <div class="form-field" style="margin-top:8px"><label class="q">Marked-area option sets <span class="faint">(Stage 3 only — two alternative garment sets, each with the style-line area marked on all three reference views)</span></label></div>
+    <div class="grid g2" style="margin-top:6px">
+      ${[0,1].map(i=>{const ms=d.markedSets[i];return `<div class="card" style="padding:12px">
+        <div class="mlabel">Option ${i+1}</div>
+        <div class="grid g3" style="margin-top:6px">
+          <div class="form-field"><label class="q" style="font-size:11px">Full garment</label><input type="file" id="atMarked_${i}_full" accept="image/*,.svg" class="txt" style="padding:6px;font-size:11px"/><div>${imgPreview(ms.full,'full')}</div></div>
+          <div class="form-field"><label class="q" style="font-size:11px">Front &amp; back</label><input type="file" id="atMarked_${i}_fb" accept="image/*,.svg" class="txt" style="padding:6px;font-size:11px"/><div>${imgPreview(ms.frontBack,'front/back')}</div></div>
+          <div class="form-field"><label class="q" style="font-size:11px">Flat sketch</label><input type="file" id="atMarked_${i}_flat" accept="image/*,.svg" class="txt" style="padding:6px;font-size:11px"/><div>${imgPreview(ms.flatSketch,'flat sketch')}</div></div>
+        </div>
+      </div>`;}).join('')}
+    </div>
+
+    <div class="form-field" style="margin-top:8px"><label class="q">Brief description <span class="faint">(for your reference)</span></label><textarea class="find" id="atDesc" style="min-height:70px" placeholder="notes about this garment / style line / what to assess…">${esc(d.desc)}</textarea></div>
+    <button class="btn blue" style="margin-top:14px" data-act="submitAddT">${isEdit?'Save changes':'Add garment'}</button>
+    <div class="faint mono" style="font-size:11px;margin-top:8px">${isEdit?'Re-uploading a field replaces it; leaving it alone keeps the current file. Stage tags are re-applied to matching tasks on save.':'A task is created in each workshop stage you tag; pre-test / post-test tags make it available as a baseline garment.'}</div>
+  </div>`;
+}
+function garmentCard(g){
+  const stageBadges=(g.stages||[]).map(s=>`<span class="tag ${s}" style="font-size:10px">${s==='pretest'?'Pre':s==='posttest'?'Post':s.toUpperCase()}</span>`).join(' ');
+  const actions = S.confirmDel===g.id
+    ? `<span class="spacer"></span><span class="mono" style="font-size:11px;color:var(--physical-ink)">Delete this garment?</span><button class="btn sm" style="background:var(--physical);border-color:var(--physical)" data-act="delGarment" data-id="${g.id}">Yes</button><button class="btn ghost sm" data-act="cancelDel">No</button>`
+    : `<span class="pid">${g.type||'Garment'}</span><span class="spacer"></span><button class="btn ghost sm" data-act="askDel" data-id="${g.id}" title="Delete garment" style="color:var(--physical-ink);padding:6px 8px">${ICON.trash}</button>`;
+  return `<div class="card gcard" data-act="editGarment" data-id="${g.id}" style="cursor:pointer">
+    <div class="gthumb">${garmentThumb(g)}</div>
+    <div class="row" style="justify-content:space-between"><div class="disp" style="font-size:17px">${g.name}</div><span class="tag ${g.cx}">${cxName(g.cx)}</span></div>
+    <div class="row" style="gap:4px;margin-top:4px;flex-wrap:wrap">${stageBadges}</div>
+    <div class="tnote">${g.solutionFile?'✓ solution attached':'no solution file'}${g.panelImgs&&g.panelImgs.length?` · ${g.panelImgs.length} panels`:''}</div>
+    <div class="row" style="margin-top:auto;padding-top:6px">${actions}</div>
+  </div>`;
+}
+function basicPanelSetCard(){
+  const items=BASIC_PANELS.map((img,i)=>`<div style="position:relative"><img src="${img}" style="height:60px;border-radius:6px;border:1px solid var(--line);object-fit:contain"/><button class="btn ghost sm" data-act="rmBasicPanel" data-i="${i}" style="position:absolute;top:-8px;right:-8px;padding:2px 6px;border-radius:50%;background:#fff">✕</button></div>`).join('');
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="row" style="justify-content:space-between"><div class="disp" style="font-size:17px">Basic panel set</div><span class="faint mono" style="font-size:11px">${BASIC_PANELS.length} panels</span></div>
+    <p class="faint" style="font-size:12px;margin-top:4px">Used automatically for pre-test and post-test — participants design panels for the given garment starting from these basics, not the garment's own panels. One shared set; update it any time, no per-task selection needed.</p>
+    <input type="file" id="atBasicPanels" accept="image/*,.svg" multiple class="txt" style="padding:9px;margin-top:8px"/>
+    <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:10px">${items||'<div class="faint mono" style="font-size:11px">no basic panels uploaded yet</div>'}</div>
+  </div>`;
+}
+function tabTasks(){
+  const cards=S.garments.map(garmentCard).join('')||'<div class="faint" style="padding:8px 0">No garments yet — add one below.</div>';
+  return `<div class="page-head"><div class="k">Console · library</div><h2>Garments</h2>
+    <p>Add garments with their reference images, panel library, and solution file here. Assign them to a stage and difficulty from Assign &amp; Activate.</p></div>
+    ${basicPanelSetCard()}
+    <div class="row" style="margin-bottom:6px">
+      <span class="mlabel">${S.garments.length} garment${S.garments.length===1?'':'s'} in library</span><span class="spacer"></span>
+      <button class="btn ghost" onclick="document.getElementById('bulkImportInput').click()">⤓ Import garment folder</button>
+      <input type="file" id="bulkImportInput" webkitdirectory directory multiple style="display:none">
+      <button class="btn ghost" data-act="tagAllStagesAll" title="Make every garment in the library available for every stage, including pre-test and post-test">🏷 Tag all garments for every stage</button>
+      <button class="btn" data-act="showAddT">+ Add garment</button>
+    </div>
+    ${S.bulkImport?bulkImportReview():''}
+    ${S.addT?taskForm():''}
+    <div class="grid g3">${cards}</div>`;
+}
+
+// ════════════════════════════════════════
+//  BULK FOLDER IMPORT — select a whole folder of garment subfolders at
+//  once (Full garment / Extract panel / One / Two / Group arrangement /
+//  Individual Panels, optionally under Simple/Moderate/Complex), and
+//  auto-sort every file into the right slot by matching folder/file names,
+//  instead of uploading each file one at a time per garment.
+// ════════════════════════════════════════
+function classifyBulkFile(relPath){
+  const parts=relPath.split('/');
+  const fname=parts[parts.length-1];
+  const lower=relPath.toLowerCase();
+  const fnameLower=fname.toLowerCase();
+  const has=(s,k)=>s.indexOf(k)>-1;
+
+  // Basic panels (global set, not a per-garment folder)
+  if(has(lower,'basic panel')) return {bucket:'basicPanel'};
+
+  // Which reference-view slot does the FILENAME itself indicate?
+  function viewSlot(s){
+    if(has(s,'front')&&has(s,'back')) return 'frontBack';
+    if(has(s,'flat')) return 'flatSketch';
+    if(has(s,'full')) return 'full';
+    return null;
+  }
+  const slot = viewSlot(fnameLower) || viewSlot(lower);
+
+  // "Panel Arrangement Solution" (renamed from "Group arrangement") — the
+  // PDF solution, ready for Clo3D import. Checked before the more generic
+  // "panel arrangement" prefix match below.
+  if(has(lower,'arrangement solution')||has(lower,'group arrangement')) return {bucket:'solution'};
+  // "Panel Arrangement - Scaffold" (new) — a PNG shown as a scaffold
+  // reference directly in the Panel Studio workspace, not a solution file.
+  if(has(lower,'arrangement - scaffold')||has(lower,'arrangement scaffold')) return {bucket:'arrangementScaffold'};
+  if(has(lower,'individual panel')) return {bucket:'panel'};
+  if(has(lower,'extract panel')){
+    const setIdx = has(lower,'/two/')||has(lower,'-two-')||/\btwo\b/.test(lower) ? 1 : 0; // default to option 1
+    return {bucket:'marked', setIdx, slot: slot||'full'};
+  }
+  if(has(lower,'full garment')||slot) return {bucket:'ref', slot: slot||'full'};
+  return {bucket:'other'};
+}
+function garmentNameFromPath(relPath){
+  // The garment name is whichever folder directly contains the known
+  // category subfolders (Extract panel / Full garment / Group arrangement /
+  // Individual Panels) — walk the path and take the segment right before
+  // the first recognized category segment.
+  const parts=relPath.split('/');
+  const catNames=['extract panel','full garment','group arrangement','individual panels','panel arrangement solution','panel arrangement - scaffold'];
+  for(let i=1;i<parts.length;i++){
+    if(catNames.includes(parts[i].toLowerCase())) return parts[i-1];
+  }
+  return parts.length>1?parts[0]:null;
+}
+function difficultyFromPath(relPath){
+  const lower=relPath.toLowerCase();
+  if(/(^|\/)simple(\/|$)/.test(lower)) return 's';
+  if(/(^|\/)moderate(\/|$)/.test(lower)) return 'm';
+  if(/(^|\/)complex(\/|$)/.test(lower)) return 'c';
+  return null;
+}
+function handleBulkImportFiles(fileList){
+  const files=[...fileList].filter(f=>f.webkitRelativePath);
+  if(!files.length){ toast('No files found — make sure you selected a folder, not individual files.'); return; }
+  const byGarment={}; // name -> {name, cx, full,frontBack,flat, panelFiles:[], solutionFile, marked:[{full,frontBack,flat},{full,frontBack,flat}]}
+  let basicPanelFiles=[];
+  let unmatched=0;
+
+  files.forEach(f=>{
+    const rel=f.webkitRelativePath;
+    const cls=classifyBulkFile(rel);
+    if(cls.bucket==='basicPanel'){ basicPanelFiles.push(f); return; }
+    if(cls.bucket==='other'){ unmatched++; return; }
+    const gname=garmentNameFromPath(rel);
+    if(!gname){ unmatched++; return; }
+    if(!byGarment[gname]) byGarment[gname]={name:gname, cx:difficultyFromPath(rel)||'s', full:null,frontBack:null,flat:null, panelFiles:[], solutionFile:null, arrangementScaffold:null, marked:[{full:null,frontBack:null,flat:null},{full:null,frontBack:null,flat:null}]};
+    const g=byGarment[gname];
+    if(cls.bucket==='ref'){ g[cls.slot==='frontBack'?'frontBack':cls.slot==='flatSketch'?'flat':'full']=f; }
+    else if(cls.bucket==='panel'){ g.panelFiles.push(f); }
+    else if(cls.bucket==='solution'){ if(!g.solutionFile || f.type==='application/pdf') g.solutionFile=f; }
+    else if(cls.bucket==='arrangementScaffold'){ g.arrangementScaffold=f; }
+    else if(cls.bucket==='marked'){ const slotKey=cls.slot==='frontBack'?'frontBack':cls.slot==='flatSketch'?'flat':'full'; g.marked[cls.setIdx][slotKey]=f; }
+  });
+
+  S.bulkImport = { garments: Object.values(byGarment), basicPanelFiles, unmatched, tagStages:{pretest:true,s1:true,s2:true,s3:true,posttest:true} };
+  render();
+}
+function bulkImportReview(){
+  const bi=S.bulkImport;
+  const rows=bi.garments.map((g,i)=>{
+    const chip=(label,file)=>`<span class="mono faint" style="font-size:10px;margin-right:8px">${file?'✓':'—'} ${label}</span>`;
+    return `<div class="card" style="padding:10px 14px;margin-bottom:6px">
+      <div class="row" style="justify-content:space-between">
+        <div><input class="txt" style="font-weight:600;padding:4px 8px" data-act="bulkRename" data-i="${i}" value="${esc(g.name)}"></div>
+        <div class="modepick" style="margin:0">${['s','m','c'].map(k=>`<button data-act="bulkCx" data-i="${i}" data-k="${k}" class="${g.cx===k?'on':''}" style="padding:4px 10px;font-size:11px">${cxName(k)}</button>`).join('')}</div>
+      </div>
+      <div style="margin-top:6px">${chip('full',g.full)}${chip('front/back',g.frontBack)}${chip('flat sketch',g.flat)}${chip('solution',g.solutionFile)}${chip('arrangement scaffold',g.arrangementScaffold)}
+        <span class="mono faint" style="font-size:10px">· ${g.panelFiles.length} panel image${g.panelFiles.length===1?'':'s'}</span>
+        <span class="mono faint" style="font-size:10px"> · marked set 1: ${g.marked[0].full||g.marked[0].frontBack||g.marked[0].flat?'✓':'—'}, set 2: ${g.marked[1].full||g.marked[1].frontBack||g.marked[1].flat?'✓':'—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  const stageChips=[['pretest','Pre-test'],['s1','Stage 1'],['s2','Stage 2'],['s3','Stage 3'],['posttest','Post-test']].map(([k,l])=>`<span class="chk ${bi.tagStages[k]?'on':''}" data-act="bulkTagStage" data-k="${k}"><span class="bx"></span>${l}</span>`).join('');
+  return `<div class="card" style="margin-bottom:16px;border-color:var(--ink)">
+    <div class="disp" style="font-size:17px">Review import — ${bi.garments.length} garment${bi.garments.length===1?'':'s'} detected</div>
+    ${bi.basicPanelFiles.length?`<p class="faint" style="font-size:12px;margin-top:4px">+ ${bi.basicPanelFiles.length} file(s) matched to the global Basic panel set.</p>`:''}
+    ${bi.unmatched?`<p class="faint" style="font-size:12px;margin-top:4px">⚠ ${bi.unmatched} file(s) didn't match a known folder (Full garment / Extract panel / Panel Arrangement Solution / Panel Arrangement - Scaffold / Individual Panels / Basic panels) and were skipped.</p>`:''}
+    <p class="faint" style="font-size:12px;margin-top:8px">Check names/difficulty below — rename or fix before importing. Rows with no reference images will still import with what was found.</p>
+    <div style="margin-top:10px;max-height:340px;overflow:auto">${rows}</div>
+    <div class="mlabel" style="margin-top:14px">Tag all imported garments for these stages <span class="faint">(applies to every garment above — adjust individually afterward if needed)</span></div>
+    <div class="checks" style="margin-top:8px">${stageChips}</div>
+    <div class="row" style="margin-top:14px;gap:8px">
+      <button class="btn ghost" data-act="cancelBulkImport">Cancel</button>
+      <button class="btn blue" data-act="confirmBulkImport">Import ${bi.garments.length} garment${bi.garments.length===1?'':'s'}</button>
+    </div>
+  </div>`;
+}
+async function confirmBulkImport(){
+  const bi=S.bulkImport; if(!bi) return;
+  const stages=Object.keys(bi.tagStages).filter(k=>bi.tagStages[k]);
+  toast('Importing… this may take a moment for a lot of files');
+  for(const g of bi.garments){
+    try{
+      const [fullImg,frontBackImg,flatSketchImg,solutionFile,arrangementScaffold,...panelImgs] = await Promise.all([
+        g.full?readImg(g.full):null, g.frontBack?readImg(g.frontBack):null, g.flat?readImg(g.flat):null,
+        g.solutionFile?readImg(g.solutionFile):null, g.arrangementScaffold?readImg(g.arrangementScaffold):null,
+        ...g.panelFiles.map(readImg)
+      ]);
+      const markedSets = await Promise.all(g.marked.map(async ms=>({
+        full: ms.full?await readImg(ms.full):null,
+        frontBack: ms.frontBack?await readImg(ms.frontBack):null,
+        flatSketch: ms.flat?await readImg(ms.flat):null,
+      })));
+      const gid='gx'+(GARMENT_SEQ++);
+      const garmentObj={id:gid,name:g.name.trim()||'Garment',type:'Garment',cx:g.cx,desc:'',
+        img:fullImg,fullImg,frontBackImg,flatSketchImg,
+        panelImgs,solutionFile,solutionFileName:g.solutionFile?g.solutionFile.name:'',
+        arrangementScaffold,
+        markedSets,stages,
+        panels:panelImgs.length?panelImgs.map(()=>'bodice'):['bodice','back']};
+      S.garments.push(garmentObj);
+      stages.filter(s=>WORKSHOP_STAGES.includes(s)).forEach(s=>{const t={id:'tk'+(TASK_SEQ++),stage:s,cx:g.cx,garmentId:gid};if(s==='s3')t.line='see garment image';TASKS.push(t);});
+    }catch(err){ console.error(err); alert('Could not import "'+g.name+'": '+(err&&err.message||err)); }
+  }
+  if(bi.basicPanelFiles.length){
+    try{ const arr=await Promise.all(bi.basicPanelFiles.map(readImg)); BASIC_PANELS=BASIC_PANELS.concat(arr); }
+    catch(err){ console.error(err); alert('Some basic panel images could not be read: '+(err&&err.message||err)); }
+  }
+  S.bulkImport=null; render();
+  toast('Import complete');
+}
+
+function scaffoldConduct(p){
+  const a=p.active, slots=SCAFFOLD_SLOTS[a.stage]||[];if(!slots.length)return '';
+  const sc=(p.work&&p.work[a.stage]&&p.work[a.stage].scaffolds)||{};
+  const rows=slots.map(s=>{const f=sc[s.key];return `<div style="display:flex;gap:12px;align-items:center;margin-top:10px">${f?`<img src="${f.dataUrl}" style="height:52px;width:64px;border-radius:8px;border:1px solid rgba(255,255,255,.2);object-fit:contain;background:#fff">`:'<div style="height:52px;width:64px;border-radius:8px;border:1px dashed rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;color:#9bb4ad;font-size:10px">none</div>'}<div style="flex:1"><div style="font-family:\'Bricolage Grotesque\';font-weight:700;font-size:14px">${s.label}</div><input type="file" accept="image/*" id="scf_${s.key}_${p.id}" data-role="${esc(s.label)}" style="color:#fff;font-size:12px;margin-top:5px"></div></div>`;}).join('');
+  return `<div class="crow" style="background:rgba(0,0,0,.16)"><div class="chead"><span class="cname">Scaffold to provide</span><span class="who">researcher uploads</span></div>
+    <div style="font-size:12px;margin-top:6px;color:#9bb4ad">${a.stage==='s2'?'Upload the garment image and the arranged-panels image the participant will print or import to Clo3D.':'Upload the garment showing the proposed style line, and the arranged panel list they can build from.'}</div>
+    ${rows}</div>`;
+}
+function conductPanel(p){
+  const a=p.active, info=STAGEINFO[a.stage], cur=a.current||'task';
+  const acts=[['task','Task','participant'],['prompt','Think-aloud','researcher'],['survey','Survey','participant'],['interview','Interview','researcher']]
+    .filter(([k])=> k==='task' || (a.share&&a.share[k]&&instrPhaseKey(k,a.stage)));
+  const rows=acts.map(([k,label,who])=>{
+    const pk=k==='task'?stagePhaseKey(a.stage):instrPhaseKey(k,a.stage);
+    const done=p.progress[pk]==='done';const live=cur===k;
+    const status=done?'<span class="cstatus done">✓ complete</span>':live?'<span class="cstatus live">● live now</span>':'<span class="cstatus pend">pending</span>';
+    let btns='';
+    if(k==='task'){btns=`<button class="btn cw ghost sm" data-act="setCurrent" data-k="task" data-pid="${p.id}">Show task to participant</button>${done?'':'<button class="btn cw sm" data-act="markInstr" data-k="task" data-pid="'+p.id+'">Mark task done</button>'}`;}
+    else if(RESEARCHER_LED[k]){const def=instrDef(k,a.stage);
+      btns=`<button class="btn cw ghost sm" data-act="setCurrent" data-k="${k}" data-pid="${p.id}">Announce to participant</button><button class="btn cw sm" data-act="markInstr" data-k="${k}" data-pid="${p.id}">Mark ${label.toLowerCase()} complete</button>`;
+      return `<div class="crow ${live?'cur':''}"><div class="chead"><span class="cname">${label}</span><span class="who">researcher-led</span>${status}</div>
+        <details ${live?'open':''}><summary>${def.groups.reduce((n,g)=>n+g.qs.length,0)} questions to ask</summary><div class="qbox">${questionList(def)}</div></details>
+        <textarea id="note_${k}" placeholder="Notes / key observations (optional, saved to record)">${esc((p[INSTR_KIND[k]]&&p[INSTR_KIND[k]][a.stage]&&p[INSTR_KIND[k]][a.stage].notes)||'')}</textarea>
+        <div class="cbtns">${btns}</div></div>`;
+    }
+    else{btns=`<button class="btn cw sm" data-act="setCurrent" data-k="survey" data-pid="${p.id}">Open survey for participant</button>${done?'':''}`;}
+    return `<div class="crow ${live?'cur':''}"><div class="chead"><span class="cname">${label}</span><span class="who">${who}-led</span>${status}</div><div class="cbtns">${btns}</div></div>`;
+  }).join('');
+  return `<div class="conduct"><h3>Live session — ${p.name}</h3><div class="sub">${info.n} · ${info.name} &nbsp;·&nbsp; participant currently sees: <b style="color:var(--hi)">${INSTR_TITLE[cur]||'Task'}</b></div>
+    ${scaffoldConduct(p)}
+    ${rows}
+    <div class="cbtns" style="margin-top:14px"><button class="btn cw ghost sm" data-act="setCurrent" data-k="waiting" data-pid="${p.id}">Put participant on standby</button><button class="btn sm" style="background:var(--physical);border-color:var(--physical)" data-act="endSession" data-pid="${p.id}">End session · release participant</button></div></div>`;
+}
+function tabAssign(){
+  const a=S.assign;
+  if(a.taskId&&!taskById(a.taskId))a.taskId=null;
+  const pOpts=S.participants.map(p=>`<option value="${p.id}" ${a.participant===p.id?'selected':''}>${p.name} · ${p.id}</option>`).join('');
+  const acts=[['pretest','Pre-test'],['s1','Stage 1'],['s2','Stage 2'],['s3','Stage 3'],['posttest','Post-test']];
+  const actBtns=acts.map(([k,l])=>`<button data-act="activity" data-k="${k}" class="${a.activity===k?'on':''}">${l}</button>`).join('');
+  const pObj=a.participant?S.participants.find(p=>p.id===a.participant):null;
+
+  // step 3 content
+  let step3='';
+  if(a.activity==='pretest'||a.activity==='posttest'){
+    const pool=S.garments.filter(gg=>(gg.stages||[]).includes(a.activity));
+    const list=a.cxFilter==='all'?pool:pool.filter(gg=>gg.cx===a.cxFilter);
+    const filters=[['all','All'],['s','Simple'],['m','Moderate'],['c','Complex']].map(([k,l])=>`<button data-act="cxFilter" data-k="${k}" class="${a.cxFilter===k?'on':''}">${l}</button>`).join('');
+    const tiles=list.map(gg=>`<div class="seltile ${a.garmentId===gg.id?'sel':''}" data-act="pickGarment" data-id="${gg.id}">
+      <div class="mini">${garmentThumb(gg,32)}</div><div><div class="disp" style="font-size:15px">${gg.name}</div><div class="mlabel">${gg.type?gg.type+' · ':''}${gg.solutionFile?'✓ solution attached':'no solution file'}</div></div>
+      <span class="spacer"></span><span class="tag ${gg.cx}">${cxName(gg.cx)}</span></div>`).join('');
+    const sel=a.garmentId?garment(a.garmentId):null;
+    const scaffoldPreview=sel?`<div class="saved" style="margin-top:10px">
+        <div class="mlabel">Scaffolding the participant will see</div>
+        <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px">
+          ${sel.fullImg?`<div><img src="${sel.fullImg}" style="height:90px;border-radius:8px;object-fit:contain;border:1px solid var(--line)"/><div class="faint mono" style="font-size:10px;text-align:center">full garment</div></div>`:''}
+          ${sel.frontBackImg?`<div><img src="${sel.frontBackImg}" style="height:90px;border-radius:8px;object-fit:contain;border:1px solid var(--line)"/><div class="faint mono" style="font-size:10px;text-align:center">front &amp; back</div></div>`:''}
+          ${sel.flatSketchImg?`<div><img src="${sel.flatSketchImg}" style="height:90px;border-radius:8px;object-fit:contain;border:1px solid var(--line)"/><div class="faint mono" style="font-size:10px;text-align:center">flat sketch</div></div>`:''}
+        </div>
+        <div class="mono faint" style="font-size:11px;margin-top:8px">${sel.solutionFile?`✓ Solution file attached (${esc(sel.solutionFileName||'solution.pdf')}) — shown to the participant for comparison after they complete their arrangement.`:'⚠ No solution file attached to this garment — add one from the garment library so the participant has something to compare against.'}</div>
+      </div>`:'';
+    step3=`<div class="filterchips">${filters}</div><div class="row" style="margin-bottom:10px"><button class="btn sm ghost" data-act="autoSelect">⚡ Auto-select garment</button><span class="faint mono" style="font-size:11px">or pick a baseline garment →</span></div><div class="grid" style="gap:8px">${tiles||'<div class="faint">No garments tagged for this stage at this difficulty.</div>'}</div>${scaffoldPreview}`;
+  } else {
+    const list = a.cxFilter==='all'?tasksOf(a.activity):tasksOf(a.activity).filter(t=>t.cx===a.cxFilter);
+    const filters=[['all','All'],['s','Simple'],['m','Moderate'],['c','Complex']].map(([k,l])=>`<button data-act="cxFilter" data-k="${k}" class="${a.cxFilter===k?'on':''}">${l}</button>`).join('');
+    const tiles=list.map(t=>{const g=garment(t.garmentId);return `<div class="seltile ${a.taskId===t.id?'sel':''}" data-act="pickTask" data-id="${t.id}">
+      <div class="mini">${garmentThumb(g,32)}</div>
+      <div><div class="disp" style="font-size:15px">${g.name}</div><div class="mlabel">${t.stage==='s3'?t.line:g.panels.length+' panels'}</div></div>
+      <span class="spacer"></span><span class="tag ${t.cx}">${cxName(t.cx)}</span></div>`;}).join('');
+    step3=`<div class="filterchips">${filters}</div><div class="row" style="margin-bottom:10px"><button class="btn sm ghost" data-act="autoSelect">⚡ Auto-pick a task</button></div><div class="grid" style="gap:8px">${tiles||'<div class="faint">No tasks at this difficulty.</div>'}</div>`;
+  }
+
+  // summary + readiness
+  let sumTask='';
+  if(a.activity==='pretest'||a.activity==='posttest'){const g=a.garmentId?garment(a.garmentId):null;sumTask=` · <b>${a.activity}</b>${g?` → <b>${g.name}</b> <span class="tag ${g.cx}">${cxName(g.cx)}</span>`:' <span class="faint">· no garment</span>'}`;}
+  else {const t=a.taskId?taskById(a.taskId):null;const g=t?garment(t.garmentId):null;sumTask=` · <b>${STAGEINFO[a.activity].name}</b>${t?` → <b>${g.name}</b> <span class="tag ${t.cx}">${cxName(t.cx)}</span>`:' <span class="faint">· no task</span>'}`;}
+  let ready=false;
+  if(a.participant&&(!pObj||pObj.consent.given)){
+    if(a.activity==='pretest'||a.activity==='posttest')ready=!!a.garmentId;
+    else ready=!!a.taskId;
+  }
+  const consentWarn=pObj&&!pObj.consent.given?`<div class="saved" style="margin-top:10px;border-color:var(--physical);color:var(--physical-ink)">⚠ ${pObj.name} hasn't completed consent — they'll be asked to consent before any task runs.</div>`:'';
+
+  const alreadyLive = pObj && pObj.active;
+  const stageTaskBody = (!alreadyLive || S.assign.forceShowPicker) ? `
+        <div class="mlabel" style="margin-top:20px">2 · Stage / activity</div>
+        <div class="modepick" style="margin-top:8px">${actBtns}</div>
+        <div class="mlabel" style="margin-top:20px">3 · Task</div>
+        <div style="margin-top:8px">${step3}</div>
+        ${['pretest','s1'].includes(a.activity)?`<div class="mlabel" style="margin-top:18px">Distractor panels <span class="faint">(optional — mix in panels from other garments)</span></div>
+          <div class="checks" style="margin-top:8px">${S.garments.filter(g=>g.id!==(a.activity==='pretest'?a.garmentId:(a.taskId?taskById(a.taskId)&&taskById(a.taskId).garmentId:null))).map(g=>`<span class="chk ${a.distractors[g.id]?'on':''}" data-act="toggleDistractor" data-k="${g.id}"><span class="bx"></span>${g.name}</span>`).join('')}</div>`:''}
+  ` : `
+        <div class="saved" style="margin-top:16px">✓ <b>${STAGEINFO[pObj.active.stage]?STAGEINFO[pObj.active.stage].name:pObj.active.stage}</b> is already live for <b>${pObj.name}</b> — no further selection needed. Use "Assign a different task" below if you want to change it.</div>
+        <button class="btn ghost sm" style="margin-top:12px" data-act="showPicker">Assign a different task</button>
+  `;
+
+  return `<div class="page-head"><div class="k">Console · assign &amp; activate</div><h2>Set up a task &amp; activate it</h2>
+    <p>Choose the participant and a stage, pick a task by difficulty (or auto-pick), set the mode and the instruments to share, then activate. It appears in the participant's view at once.</p></div>
+    ${pObj&&pObj.active?conductPanel(pObj):''}
+    <div class="grid g2">
+      <div class="card">
+        <div class="mlabel">1 · Participant</div>
+        <select class="txt" id="assignP" style="margin-top:8px"><option value="">— choose —</option>${pOpts}</select>${consentWarn}
+        ${stageTaskBody}
+      </div>
+      <div class="card">
+        <div class="mlabel">4 · Mode</div>
+        <div class="modepick" style="margin:8px 0 18px">
+          <button data-act="mode" data-m="physical" class="${a.mode==='physical'?'on':''}">Physical</button>
+          <button data-act="mode" data-m="digital" class="${a.mode==='digital'?'on':''}">Digital</button>
+        </div>
+        <div class="mlabel">5 · Share instruments</div>
+        <div class="checks" style="margin:8px 0 18px">${['prompt','survey','interview'].map(k=>`<span class="chk ${a.share[k]?'on':''}" data-act="share" data-k="${k}"><span class="bx"></span>${k}</span>`).join('')}</div>
+        <div class="mlabel">Summary</div>
+        <div class="saved" style="margin-top:8px">${a.participant?`<b>${S.participants.find(p=>p.id===a.participant).name}</b>`:'<span class="faint">no participant</span>'}${sumTask}
+          <div class="mono faint" style="font-size:11px;margin-top:6px">mode: ${a.mode} · sharing: ${Object.keys(a.share).filter(k=>a.share[k]).join(', ')||'none'}</div></div>
+        <button class="btn blue" style="margin-top:16px;width:100%;justify-content:center" data-act="activate" ${ready?'':'disabled'}>▶ Activate for participant</button>
+      </div>
+    </div>`;
+}
+
+// ════════════════════════════════════════
+//  PACKAGE & SEND — bundle all 5 stages for a participant into one JSON
+//  file the participant imports and works through on their own machine,
+//  saving/re-sharing progress as a checkpoint file after each stage.
+// ════════════════════════════════════════
+const PKG_STAGE_ORDER=['pretest','s1','s2','s3','posttest'];
+function ensurePlan(p){
+  if(!p.plan) p.plan={
+    mode:'physical',
+    share:{prompt:true,survey:true,interview:true},
+    stages:{
+      pretest:{cx:'s',garmentId:null,distractors:{}},
+      s1:{cx:'s',taskId:null,distractors:{}},
+      s2:{cx:'s',taskId:null},
+      s3:{cx:'s',taskId:null},
+      posttest:{cx:'s',garmentId:null,distractors:{}}
+    }
+  };
+  return p.plan;
+}
+function stagePickerHTML(stageKey,p){
+  const plan=ensurePlan(p), cfg=plan.stages[stageKey];
+  const isGarmentStage = stageKey==='pretest'||stageKey==='posttest';
+  const viewCx=S.pkg.viewFilter[stageKey]||'all';
+  const filters=[['all','All'],['s','Simple'],['m','Moderate'],['c','Complex']].map(([k,l])=>`<button data-act="pkgCxFilter" data-stage="${stageKey}" data-k="${k}" class="${viewCx===k?'on':''}">${l}</button>`).join('');
+
+  let tiles='', selName='', hasSelection=false;
+  if(isGarmentStage){
+    const pool=S.garments.filter(gg=>(gg.stages||[]).includes(stageKey));
+    const list=viewCx==='all'?pool:pool.filter(gg=>gg.cx===viewCx);
+    tiles=list.map(gg=>`<div class="seltile ${cfg.garmentId===gg.id?'sel':''}" data-act="pkgPickGarment" data-stage="${stageKey}" data-id="${gg.id}">
+      <div class="mini">${garmentThumb(gg,28)}</div><div><div class="disp" style="font-size:14px">${gg.name}</div></div>
+      <span class="spacer"></span><span class="tag ${gg.cx}">${cxName(gg.cx)}</span></div>`).join('')||'<div class="faint" style="font-size:12px">No garments tagged for this stage.</div>';
+    const g=cfg.garmentId?garment(cfg.garmentId):null;
+    selName=g?g.name:''; hasSelection=!!g;
+  } else {
+    const pool=tasksOf(stageKey);
+    const list=viewCx==='all'?pool:pool.filter(t=>t.cx===viewCx);
+    tiles=list.map(t=>{const g=garment(t.garmentId);return `<div class="seltile ${cfg.taskId===t.id?'sel':''}" data-act="pkgPickTask" data-stage="${stageKey}" data-id="${t.id}">
+      <div class="mini">${garmentThumb(g,28)}</div><div><div class="disp" style="font-size:14px">${g.name}</div>${stageKey==='s3'&&t.line?`<div class="mlabel">${t.line}</div>`:''}</div>
+      <span class="spacer"></span><span class="tag ${t.cx}">${cxName(t.cx)}</span></div>`;}).join('')||'<div class="faint" style="font-size:12px">No tasks in this stage yet — add a garment tagged for it.</div>';
+    const t=cfg.taskId?taskById(cfg.taskId):null;
+    selName=t?garment(t.garmentId).name:''; hasSelection=!!t;
+  }
+  const autoAct = isGarmentStage?'pkgAutoGarment':'pkgAutoTask';
+  const distractorHTML = (stageKey==='pretest'||stageKey==='s1') ? `
+    <div class="mlabel" style="margin-top:10px;font-size:11px">Distractor panels <span class="faint">(optional)</span></div>
+    <div class="checks" style="margin-top:6px">${S.garments.filter(g=>g.id!==(cfg.garmentId||(cfg.taskId&&taskById(cfg.taskId)?taskById(cfg.taskId).garmentId:null))).map(g=>`<span class="chk ${cfg.distractors&&cfg.distractors[g.id]?'on':''}" data-act="pkgToggleDistractor" data-stage="${stageKey}" data-k="${g.id}"><span class="bx"></span>${g.name}</span>`).join('')||'<span class="faint" style="font-size:11px">no other garments yet</span>'}</div>` : '';
+
+  return `<div class="card" style="margin-bottom:12px">
+    <div class="row" style="justify-content:space-between">
+      <div class="disp" style="font-size:16px">${STAGEINFO[stageKey].name}</div>
+      ${hasSelection?`<span class="saved" style="padding:3px 10px;font-size:11px">✓ ${esc(selName)}</span>`:'<span class="faint mono" style="font-size:11px">not assigned yet</span>'}
+    </div>
+    <div class="filterchips" style="margin-top:8px">${filters}</div>
+    <div class="row" style="margin:8px 0"><button class="btn sm ghost" data-act="${autoAct}" data-stage="${stageKey}">⚡ Auto-select</button></div>
+    <div class="grid" style="gap:6px;max-height:220px;overflow:auto">${tiles}</div>
+    ${distractorHTML}
+  </div>`;
+}
+function tabPackage(){
+  const pOpts=S.participants.map(p=>`<option value="${p.id}" ${S.pkg.participant===p.id?'selected':''}>${p.name} · ${p.id}</option>`).join('');
+  const p = S.pkg.participant?S.participants.find(x=>x.id===S.pkg.participant):null;
+  if(!p){
+    return `<div class="page-head"><div class="k">Console · package &amp; send</div><h2>Package &amp; send</h2>
+      <p>Build a self-contained task package for a participant working on a separate machine — they import it, work through all five stages at their own pace, and save/share a checkpoint file back to you after each one.</p></div>
+      <div class="card"><div class="mlabel">Participant</div><select class="txt" id="pkgP" style="margin-top:8px"><option value="">— choose —</option>${pOpts}</select></div>`;
+  }
+  const plan=ensurePlan(p);
+  const stageBlocks=PKG_STAGE_ORDER.map(sk=>stagePickerHTML(sk,p)).join('');
+  const assignedCount=PKG_STAGE_ORDER.filter(sk=>{const c=plan.stages[sk];return (sk==='pretest'||sk==='posttest')?!!c.garmentId:!!c.taskId;}).length;
+  return `<div class="page-head"><div class="k">Console · package &amp; send</div><h2>Package &amp; send — ${esc(p.name)}</h2>
+    <p>Set up all five stages for this participant, then export one JSON file. They import it on their own machine and work through Pre-test → Stage 1 → Stage 2 → Stage 3 → Post-test in order, saving a checkpoint file back to you after each stage.</p></div>
+    <div class="card" style="margin-bottom:16px"><div class="mlabel">Participant</div><select class="txt" id="pkgP" style="margin-top:8px"><option value="">— choose —</option>${pOpts}</select>
+      ${!p.consent.given?`<div class="saved" style="margin-top:10px;border-color:var(--physical);color:var(--physical-ink)">⚠ ${p.name} hasn't completed consent yet.</div>`:''}
+    </div>
+    <div class="grid g2">
+      <div>${stageBlocks}</div>
+      <div>
+        <div class="card">
+          <div class="mlabel">Mode</div>
+          <div class="modepick" style="margin:8px 0 18px">
+            <button data-act="pkgMode" data-m="physical" class="${plan.mode==='physical'?'on':''}">Physical</button>
+            <button data-act="pkgMode" data-m="digital" class="${plan.mode==='digital'?'on':''}">Digital</button>
+          </div>
+          <div class="mlabel">Share instruments <span class="faint">(bundled into the package — surveys are self-serve; prompt/interview are face-to-face, with a text box for the participant's response)</span></div>
+          <div class="checks" style="margin:8px 0 18px">${['prompt','survey','interview'].map(k=>`<span class="chk ${plan.share[k]?'on':''}" data-act="pkgShare" data-k="${k}"><span class="bx"></span>${k}</span>`).join('')}</div>
+          <div class="mlabel">Ready to export</div>
+          <div class="saved" style="margin-top:8px">${assignedCount} / 5 stages assigned<div class="mono faint" style="font-size:11px;margin-top:4px">You can export a partial package (e.g. pre-test only) and send an updated one later once more stages are ready.</div></div>
+          <button class="btn blue" style="margin-top:16px;width:100%;justify-content:center" data-act="exportPackage" data-id="${p.id}" ${assignedCount?'':'disabled'}>⤓ Export package for ${esc(p.name)}</button>
+        </div>
+      </div>
+    </div>`;
+}
+function buildParticipantPackage(p){
+  const plan=ensurePlan(p);
+  const stagesOut={};
+  PKG_STAGE_ORDER.forEach(sk=>{
+    const cfg=plan.stages[sk];
+    let g=null,t=null,tray=[];
+    if(sk==='pretest'||sk==='posttest'){
+      g=cfg.garmentId?garment(cfg.garmentId):null;
+      const dg=Object.keys(cfg.distractors||{}).filter(k=>cfg.distractors[k]).map(garment).filter(Boolean);
+      tray=g?buildTrayFromDescs(descFromBasicPanels(),dg):[];
+    } else {
+      t=cfg.taskId?taskById(cfg.taskId):null;
+      g=t?garment(t.garmentId):null;
+      const dg=(sk==='s1'&&cfg.distractors)?Object.keys(cfg.distractors).filter(k=>cfg.distractors[k]&&(!t||k!==t.garmentId)).map(garment).filter(Boolean):[];
+      tray=g?buildTray(g,dg):[];
+    }
+    stagesOut[sk]={
+      assigned:!!g,
+      cx:cfg.cx||(g?g.cx:'s'),
+      garment:g?{id:g.id,name:g.name,type:g.type,cx:g.cx,fullImg:g.fullImg,frontBackImg:g.frontBackImg,flatSketchImg:g.flatSketchImg,arrangementScaffold:g.arrangementScaffold,solutionFile:g.solutionFile,solutionFileName:g.solutionFileName,markedSets:g.markedSets,desc:g.desc}:null,
+      styleLine:(sk==='s3'&&t)?t.line:null,
+      tray:tray,
+      completed:false, completedAt:null,
+      activityDraft:null,
+      response:{survey:null,promptNotes:'',interviewNotes:'',uploads:[],submittedAt:null}
+    };
+  });
+  return {
+    flatform_participant_package:true, version:1, schemaVersion:2,
+    createdAt:new Date().toISOString(),
+    participant:{id:p.id,name:p.name,code:p.code||p.id,email:p.email||'',detail:p.detail||''},
+    mode:plan.mode, share:{...plan.share},
+    consent:{recording:p.consent?p.consent.recording||'no':'no', interactionLogging:false},
+    progress:{currentStage:'pretest',completedStages:[],currentScreen:'brief'},
+    sessions:[], eventLog:[], syncLog:[],
+    stages:stagesOut
+  };
+}
+function exportPackage(pid){
+  const p=S.participants.find(x=>x.id===pid); if(!p) return;
+  const pkg=buildParticipantPackage(p);
+  downloadJSON(pkg, `participant-${(p.code||p.id).replace(/\s+/g,'-')}-package.json`);
+  toast('Package exported for '+p.name+' — send this file to their machine');
+}
+
+function tabAnalysis(){
+  const head=PHASES.map(p=>p.divider?'':`<th>${p.label}</th>`).join('');
+  const rows=S.participants.map(p=>{
+    const cells=PHASES.map(ph=>ph.divider?'<td style="padding:0;width:6px"></td>':`<td><span class="cell ${p.progress[ph.key]==='done'?'done':p.progress[ph.key]==='active'?'active':''}"></span></td>`).join('');
+    return `<tr><td class="name">${p.name}<div class="pid">${p.id}</div></td>${cells}</tr>`;
+  }).join('');
+  const stats=[{ph:'Pre-test',ease:42,conf:38},{ph:'Stage 1',ease:55,conf:50},{ph:'Stage 2',ease:48,conf:58},{ph:'Stage 3',ease:40,conf:62},{ph:'Post-test',ease:71,conf:78}];
+  const chart=stats.map(s=>`<div class="bcol"><div class="bars"><div class="bar" style="height:${s.ease}%;background:var(--survey)"></div><div class="bar" style="height:${s.conf}%;background:var(--digital)"></div></div><div class="lab">${s.ph}</div></div>`).join('');
+  const sel=S.selParticipant?S.participants.find(p=>p.id===S.selParticipant):null;
+  const pOpts=S.participants.map(p=>`<option value="${p.id}" ${S.selParticipant===p.id?'selected':''}>${p.name} · ${p.id}</option>`).join('');
+  const detail=sel?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="disp" style="font-size:19px">${sel.name} <span class="pid">${sel.id}</span></div><span class="cx"><i style="background:var(--done)"></i>${phaseDoneCount(sel)}/${PHASE_KEYS.length} done</span></div>
+    ${contactHTML(sel)}${tasksActivitiesHTML(sel)}${workHTML(sel)}${instrumentsHTML(sel)}
+    <div class="mlabel" style="margin-top:14px">Consent &amp; demographics</div>
+    <div class="saved" style="margin-top:6px;font-family:'JetBrains Mono';font-size:12px">${sel.consent.given?`consent given · recording: ${sel.consent.recording}${sel.consent.age?` · age ${sel.consent.age}`:''}${sel.consent.bg?` · ${sel.consent.bg}`:''}`:'consent not yet given'}</div>
+    <div class="mlabel" style="margin-top:14px">Artefacts &amp; recordings</div>
+    <div style="margin:6px 0 16px">${(sel.arts?Array.from({length:sel.arts}):[]).map((_,i)=>`<div class="artrow"><span class="ai">${ICON.file}</span><a href="#">${sel.id.toLowerCase()}_artefact_${i+1}.svg</a><span class="spacer"></span><span class="mono faint" style="font-size:11px">screen + video</span></div>`).join('')||'<div class="faint" style="padding:8px 0">No artefacts yet.</div>'}</div>
+    ${operationalMetricsHTML(sel.code||sel.id)}
+    <div class="mlabel" style="margin-top:14px">Researcher findings</div>
+    <textarea class="find" id="findArea" placeholder="Document your observations — strategies, coding against the framework, points of difficulty…">${sel.findings||''}</textarea>
+    <div class="row" style="margin-top:10px"><button class="btn" data-act="saveFindings" data-id="${sel.id}">Save findings</button><span class="faint mono" style="font-size:11px">saved to record · exportable to sheets</span></div>
+    ${sel.findings?`<div class="mlabel" style="margin-top:18px">Previously documented</div><div class="saved" style="margin-top:6px">${sel.findings}</div>`:''}`:`<div class="empty"><div class="faint">Select a participant to view consent, artefacts and document findings.</div></div>`;
+  return `<div class="page-head"><div class="k">Console · data &amp; analysis</div><h2>Data &amp; analysis</h2>
+    <p>Status across the protocol's stages, aggregated survey trends, and per-participant documentation. Export everything organised into per-participant and per-garment folders.</p></div>
+    <div class="row" style="margin-bottom:16px"><button class="btn" data-act="exportZip">⬇ Export all data (.zip)</button>${window.showDirectoryPicker?'<button class="btn ghost" data-act="exportFolder">Save into a folder…</button>':''}<button class="btn ghost" onclick="document.getElementById('importPkgInput').click()">📥 Import participant's returned file</button><input type="file" id="importPkgInput" accept="application/json,.json" style="display:none" onchange="importParticipantPackage(this)"><span class="faint mono" style="font-size:11px">folders per participant &amp; per garment · CSV summaries · uploaded images</span></div>
+    <div class="card" style="margin-bottom:16px"><div class="row" style="justify-content:space-between"><div class="disp" style="font-size:17px">Completion matrix</div>
+      <div class="legend" style="margin:0"><span><i style="background:var(--done)"></i>done</span><span><i style="background:var(--hi)"></i>active</span><span><i style="background:var(--card);border:1.5px solid var(--line)"></i>pending</span></div></div>
+      <div class="matrix" style="margin-top:12px"><table class="mx"><thead><tr><th style="text-align:left">Participant</th>${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="grid g2" style="margin-bottom:16px">
+      <div class="card"><div class="disp" style="font-size:17px">Survey trend · ease vs confidence</div><div class="mlabel" style="margin-top:4px">mean self-report by stage <span class="faint">(sample)</span></div>
+        <div class="chart" style="margin-top:14px">${chart}</div><div class="legend"><span><i style="background:var(--survey)"></i>perceived ease</span><span><i style="background:var(--digital)"></i>confidence</span></div></div>
+      <div class="card"><div class="disp" style="font-size:17px">At a glance</div><div class="grid g2" style="margin-top:12px">
+        <div class="card" style="background:var(--paper-2)"><div class="mlabel">Participants</div><div class="disp" style="font-size:30px">${S.participants.length}</div></div>
+        <div class="card" style="background:var(--paper-2)"><div class="mlabel">Consented</div><div class="disp" style="font-size:30px">${S.participants.filter(p=>p.consent.given).length}</div></div>
+        <div class="card" style="background:var(--paper-2)"><div class="mlabel">Awaiting action</div><div class="disp" style="font-size:30px">${notifyCount()}</div></div>
+        <div class="card" style="background:var(--paper-2)"><div class="mlabel">Tasks in bank</div><div class="disp" style="font-size:30px">${TASKS.length}</div></div>
+      </div></div></div>
+    <div class="card"><div class="row" style="justify-content:space-between"><div class="disp" style="font-size:17px">Per-participant findings</div>
+      <select class="txt" id="anaSel" style="width:auto"><option value="">— select participant —</option>${pOpts}</select></div>
+      <div style="margin-top:14px">${detail}</div></div>`;
+}
+
+function renderResearcher(){
+  let inner = S.rtab==='participants'?tabParticipants():S.rtab==='tasks'?tabTasks():S.rtab==='assign'?tabAssign():S.rtab==='package'?tabPackage():tabAnalysis();
+  root.innerHTML=researcherShell(inner);
+}
+
+/* participant */
+function renderParticipant(){
+  if(!S.curUser){
+    root.innerHTML=`<div class="shell solo"><main class="view"><div class="card login">
+      <svg viewBox="0 0 120 60" fill="none"><path d="M14 14 L48 8 L54 50 L20 56 Z" stroke="var(--physical)" stroke-width="2"/><path d="M70 50 L66 12 L100 8 L108 22 L100 26 L104 52 Z" stroke="var(--digital)" stroke-width="2"/></svg>
+      <h2>Welcome to the Workshop Console</h2><p class="muted">First time here? Tell us your name. Returning? Pick your login — the researcher activates your tasks.</p>
+      <div class="field"><div class="mlabel">Your name &amp; details</div>
+        <input class="txt" id="newName" placeholder="e.g. Anjali — M.Des Y1" style="margin:8px 0 12px"/>
+        <button class="btn blue" style="width:100%;justify-content:center" data-act="newLogin">Start</button>
+        <div class="mlabel" style="text-align:center;margin:16px 0 8px">— or sign in —</div>
+        <select class="txt" id="loginSel"><option value="">choose your login</option>${S.participants.map(p=>`<option value="${p.id}">${p.name} · ${p.id}</option>`).join('')}</select>
+      </div></div></main></div>`;
+    const ls=$('#loginSel');if(ls)ls.onchange=e=>{if(e.target.value){S.curUser=e.target.value;S.pstage='task';render();}};
+    return;
+  }
+  const me=S.participants.find(p=>p.id===S.curUser);
+  if(!me.consent.given){root.innerHTML=consentHTML(me);initSig();return;}
+
+  const av=me.active, cur=av?(av.current||'task'):null;
+  if(av && cur==='survey'){
+    const def=instrDef('survey',av.stage)||SURVEYDEF.pretest;
+    root.innerHTML=`<div class="shell solo"><main class="view pview">
+      ${phaseBanner(av,'survey')}
+      <div class="page-head"><div class="k" style="color:var(--survey)">${av.stage.toUpperCase()} · survey</div><h2>${def.title}</h2><p>${def.sub} Your responses are saved to your record.</p></div>
+      <div class="card">${def.qs.map((q,i)=>surveyQ(q,i)).join('')}</div>
+      <div class="row" style="margin-top:16px"><button class="btn blue" data-act="submitInstr">Submit survey</button><span class="faint mono" style="font-size:11px">→ captured · researcher notified</span></div>
+    </main></div>`;
+    return;
+  }
+  if(av && (cur==='prompt'||cur==='interview')){
+    root.innerHTML=`<div class="shell solo"><main class="view pview">
+      ${phaseBanner(av,cur)}
+      <div class="card empty">${cur==='prompt'?ICON.layers:ICON.clock}
+        <h3>${INSTR_TITLE[cur]} in progress</h3>
+        <p class="muted" style="max-width:48ch">Your researcher is guiding this part with you face-to-face. ${cur==='prompt'?'Please keep thinking aloud — describe what you are doing and why as you go.':'Please answer the researcher\'s questions in conversation.'} There's nothing to fill in on screen.</p>
+        <div class="recbar" style="justify-content:center;margin-top:18px"><span class="rec"></span> session in progress</div></div>
+    </main></div>`;
+    return;
+  }
+  if(av && cur==='waiting'){
+    root.innerHTML=`<div class="shell solo"><main class="view pview">
+      ${phaseBanner(av,'waiting')}
+      <div class="card empty">${ICON.clock}<h3>One moment…</h3><p class="muted">Your researcher will start the next part shortly. Please stay on this screen.</p>
+      <div class="recbar" style="justify-content:center;margin-top:18px"><span class="faint">Waiting for the researcher…</span></div></div>
+    </main></div>`;
+    return;
+  }
+  if(!me.active){
+    root.innerHTML=`<div class="shell solo"><main class="view pview"><div class="card empty">${ICON.clock}
+      <h3>Nothing active right now</h3><p class="muted">Signed in as <b>${me.name}</b>. When the researcher activates your next task, it appears here.</p>
+      <div class="recbar" style="justify-content:center;margin-top:18px"><span class="faint">Waiting for the researcher…</span></div></div></main></div>`;
+    return;
+  }
+  const a=me.active, info=STAGEINFO[a.stage], g=garment(a.garmentId);
+  const mode=a.mode==='ask'?me.mode:a.mode;
+  let steps=info.steps; if(a.stage==='s2') steps=mode==='digital'?info.stepsDig:info.stepsPhys;
+  const cx=a.cx||(g?g.cx:'s');
+  const styleLine=a.stage==='s3'&&a.line?`<span class="cx"><i style="background:var(--ink)"></i>Style line: <b style="color:var(--ink)">${a.line}</b></span>`:'';
+  const scaffold=info.scaffold?`<div class="scaffold-note"><span class="si">${ICON.layers}</span><div><b>Scaffold</b> — ${info.scaffold}</div></div>`:'';
+  const recordLine=me.consent.recording==='no'?`<div class="recbar"><span class="faint">● recording opted out · timer running</span></div>`:`<div class="recbar"><span class="rec"></span> screen &amp; video recording · timer running</div>`;
+  const hasScaffold=(SCAFFOLD_SLOTS[a.stage]||[]).length>0;
+  root.innerHTML=`<div class="shell solo"><main class="view pview">
+    ${phaseBanner(a,'task')}
+    <div class="ptask-head"><span class="tnum">${info.n}</span>
+      <div><div class="mono" style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint)">stage ${info.n} · ${me.name}</div><h2 style="font-size:30px;margin-top:4px">${info.name}</h2></div>
+      <span class="spacer"></span><span class="tag ${cx}">${cxName(cx)}</span><span class="tag ${mode==='physical'?'phys':'dig'}">${mode}</span></div>
+    <p class="muted" style="font-size:17px;max-width:56ch">${info.brief}</p>
+    <div class="row" style="margin-top:10px"><span class="cx"><i style="background:var(--ink)"></i>Garment: <b style="color:var(--ink)">${g?g.name:'assigned'}</b></span>${g&&g.type?`<span class="cx"><i style="background:var(--ink-faint)"></i>${g.type}</span>`:''}${styleLine}</div>
+    ${hasScaffold?scaffoldsView(me,a):(g&&g.img?`<div class="card" style="margin-top:12px;padding:12px;text-align:center"><img src="${g.img}" style="max-height:220px;max-width:100%;object-fit:contain"/><div class="faint mono" style="font-size:11px;margin-top:6px">garment image</div></div>`:'')}
+    ${hasScaffold?'':panelRefTiles(a,g)}
+    <div class="refer">${info.refer.map(r=>`<div class="rt"><div class="k">refer</div><div class="v">${r}</div></div>`).join('')}</div>
+    <div class="mlabel" style="margin-top:20px">Steps to complete</div>
+    <ol class="psteps">${steps.map((s,i)=>`<li><span class="n">${i+1}</span>${s}</li>`).join('')}</ol>
+    ${scaffold}
+    ${stageHowto(a)}
+    ${uploadsBlock(me,a)}
+    ${recordLine}
+    <div class="row" style="margin-top:18px"><button class="btn blue" data-act="completeTask">✓ Submit / Complete task</button><span class="faint mono" style="font-size:11px">→ sends your solution + time to the researcher</span></div>
+  </main></div>`;
+}
+
+function surveyQ(q,i){
+  const tlabel={likert:'scale',single:'single choice',multi:'multiple choice',open:'open ended'}[q.t];
+  let body='';
+  if(q.t==='likert'){body=`<div class="likert"><span class="ends">${q.ends[0]}</span>${[1,2,3,4,5].map(n=>`<span class="opt"><input type="radio" name="q${i}" value="${n}" id="q${i}_${n}"><label for="q${i}_${n}">${n}</label></span>`).join('')}<span class="ends">${q.ends[1]}</span></div>`;}
+  else if(q.t==='single'||q.t==='multi'){const type=q.t==='single'?'radio':'check';const input=q.t==='single'?'radio':'checkbox';body=`<div class="opts">${q.opts.map(o=>`<label class="opt-row ${type}"><input type="${input}" name="q${i}" value="${esc(o)}"><span class="mk"></span>${o}</label>`).join('')}</div>`;}
+  else{body=`<div class="q-open"><textarea id="qopen${i}" placeholder="Type your answer…"></textarea></div>`;}
+  return `<div class="survey-q"><div class="qn">Q${i+1}</div><div class="qt">${q.q}<span class="qtype">${tlabel}</span></div>${body}</div>`;
+}
+function readSurvey(def){return def.qs.map((q,i)=>{let ans;
+  if(q.t==='likert'){const el=document.querySelector(`input[name="q${i}"]:checked`);ans=el?Number(el.value):null;}
+  else if(q.t==='single'){const el=document.querySelector(`input[name="q${i}"]:checked`);ans=el?el.value:null;}
+  else if(q.t==='multi'){ans=[...document.querySelectorAll(`input[name="q${i}"]:checked`)].map(e=>e.value);}
+  else{const el=document.getElementById('qopen'+i);ans=el?el.value.trim():'';}
+  return {q:q.q,type:q.t,answer:ans};
+});}
+
+function consentHTML(me){
+  return `<div class="shell solo"><main class="view pview">
+    <div class="doc-head"><div class="disp t">Informed consent</div>
+      <div class="meta">Study — “Fostering Spatial Imagination in Fashion Design Education”<br>PI: Sridhar Iyer · Centre for Educational Technology, IIT Bombay<br>Document IITB/IRB/ICF-A/2024 · Researcher taking consent: Amalendhu S P</div></div>
+    <div class="mlabel" style="margin-bottom:8px">Information sheet — please read</div>
+    <div class="infosheet">
+      <h4>About the study</h4><p>This research develops a training programme to help design students strengthen 2D→3D and 3D→2D visualisation and spatial design. Your participation helps identify gaps in current teaching and shape better learning strategies.</p>
+      <h4>Who can take part</h4><p>Design students aged 18–31 currently enrolled in a higher education institution.</p>
+      <h4>What's involved</h4><ul><li>One to two sessions, about 1.5–3 hours each.</li><li>Basic details: name (optional), age, educational background, prior design experience.</li><li>No physical measurements are taken.</li><li>Data is gathered through questionnaires, interviews and observation of the artefacts you create; sessions may be audio/video recorded for analysis.</li></ul>
+      <h4>Your rights &amp; risks</h4><p>Risk is minimal — possible mild fatigue, privacy concerns, or self-consciousness when recorded. Regular breaks are given, responses are anonymised, and you may skip any question or opt out of recording. Participation is voluntary and you may withdraw at any time without consequence.</p>
+      <h4>Confidentiality</h4><p>Access to data is restricted to the research team; data is stored securely and anonymised. Findings may appear in publications without any personally identifiable information.</p>
+      <h4>Contact</h4><p>PI Sridhar Iyer · sri@iitb.ac.in · +91-22-25764820. Questions for the review board: irb@ircc.iitb.ac.in.</p>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="disp" style="font-size:17px">Your details</div>
+      <div class="grid g2" style="margin-top:12px">
+        <div class="form-field"><label class="q">Name <span class="faint">(optional)</span></label><input class="txt" id="cName" placeholder="Your name"/></div>
+        <div class="form-field"><label class="q">Age <span class="req">required</span></label><input class="txt" id="cAge" inputmode="numeric" placeholder="18–31"/></div>
+      </div>
+      <div class="grid g2">
+        <div class="form-field"><label class="q">Educational background <span class="req">required</span></label><input class="txt" id="cBg" placeholder="e.g. M.Des, Fashion, Year 1"/></div>
+        <div class="form-field"><label class="q">Prior experience with design tasks</label><select class="txt" id="cExp"><option>None</option><option>Some</option><option>Considerable</option></select></div>
+      </div>
+      <div class="form-field" style="margin-top:18px"><label class="q">Consent for audio / video recording <span class="req">required</span></label>
+        <div class="yn"><span><input type="radio" name="rec" id="recYes" value="yes"><label for="recYes">✓ Yes, I consent to recording</label></span><span><input type="radio" name="rec" id="recNo" value="no"><label for="recNo">✕ No recording</label></span></div></div>
+      <div class="form-field" style="margin-top:18px"><label class="q">Certificate of consent <span class="req">required</span></label>
+        <label class="consent-stmt"><input type="checkbox" id="cAgree"><span>I have read the information (or it has been read to me), I had the chance to ask questions, and I consent voluntarily to take part in this research.</span></label></div>
+      <div class="grid g2" style="margin-top:14px">
+        <div class="form-field"><label class="q">Print name <span class="req">required</span></label><input class="txt" id="cPrint" placeholder="Full name"/></div>
+        <div class="form-field"><label class="q">Date</label><input class="txt" id="cDate" value="${today()}"/></div>
+      </div>
+      <div class="form-field" style="margin-top:8px"><label class="q">Signature <span class="faint">(optional — draw below)</span></label>
+        <div class="sigwrap"><canvas id="sigpad"></canvas><span class="sighint" id="sigHint">sign here</span><button class="btn ghost sm" data-act="clearSig" style="position:absolute;top:8px;right:8px">Clear</button></div></div>
+      <button class="btn blue" style="margin-top:18px;width:100%;justify-content:center" data-act="submitConsent">Give consent &amp; continue</button>
+    </div>
+  </main></div>`;
+}
+
+function initSig(){
+  const c=$('#sigpad'); if(!c) return;
+  const ctx=c.getContext('2d'); let drawing=false, has=false;
+  function size(){const r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#1A1B24';}
+  size();
+  const pos=e=>{const r=c.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};};
+  const start=e=>{drawing=true;has=true;const h=$('#sigHint');if(h)h.style.display='none';const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault();};
+  const move=e=>{if(!drawing)return;const p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.preventDefault();};
+  const end=()=>{drawing=false;};
+  c.addEventListener('pointerdown',start);c.addEventListener('pointermove',move);window.addEventListener('pointerup',end);
+  c._clear=()=>{ctx.clearRect(0,0,c.width,c.height);has=false;const h=$('#sigHint');if(h)h.style.display='block';};
+  c._has=()=>has;
+}
+
+function render(){
+  CUR_WS=null;
+  $('#pswitch').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.p===S.perspective));
+  renderWho();
+  if(S.perspective==='researcher') renderResearcher(); else renderParticipant();
+}
+$('#pswitch').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.perspective=b.dataset.p;render();});
+
+root.addEventListener('click',e=>{
+  const tabBtn=e.target.closest('[data-tab]');
+  if(tabBtn){S.rtab=tabBtn.dataset.tab;render();return;}
+  const el=e.target.closest('[data-act]'); if(!el)return;
+  const act=el.dataset.act,id=el.dataset.id;
+  if(act==='recordFindings'){const p=S.participants.find(x=>x.id===id);p.notify=false;S.selParticipant=id;S.rtab='analysis';render();toast(`Opened ${p.name}'s record`);}
+  else if(act==='showAddP'){S.addP=true;render();}
+  else if(act==='cancelAddP'){S.addP=false;render();}
+  else if(act==='openP'){if(e.cancelable)e.preventDefault();S.selParticipant=id;S.rtab='analysis';render();}
+  else if(act==='submitAddP'){
+    const code=$('#apCode').value.trim(); if(!code){toast('A pseudoname / code is required');return;}
+    if(S.participants.some(p=>(p.code||p.id)===code||p.id===code)){toast('That code is already in use');return;}
+    S.participants.push({id:code,code,name:$('#apName').value.trim()||code,email:$('#apEmail').value.trim(),phone:$('#apPhone').value.trim(),detail:'added',mode:'physical',consent:{given:false},progress:progressTo(-1,-1),notify:false,active:null,findings:'',arts:0});
+    S.addP=false;render();toast(`Added participant ${code}`);
+  }
+  else if(act==='goAssign'){S.assign.participant=id;S.rtab='assign';render();}
+  else if(act==='openArts'){e.preventDefault();S.selParticipant=id;S.rtab='analysis';render();}
+  else if(act==='useTask'){const t=taskById(id);S.assign.activity=t.stage;S.assign.taskId=t.id;S.assign.garmentId=t.garmentId;S.assign.cxFilter='all';S.rtab='assign';render();toast(`Task ${t.id} loaded into assignment`);}
+  else if(act==='exportZip'){exportZip();}
+  else if(act==='exportFolder'){exportFolder();}
+  else if(act==='dlTaskFile'){const me=S.participants.find(p=>p.id===S.curUser);if(me&&me.active){const g=garment(me.active.garmentId);downloadJSON(buildTaskFile(me.active,g),`task-${me.active.stage}-${(g&&g.name?g.name.replace(/\s+/g,'-'):'garment')}.json`);toast('Task file downloaded — open it in Panel Studio');}}
+  else if(act==='dlTaskCard'){const t=taskById(id);if(t){const g=garment(t.garmentId);downloadJSON(buildTaskFile({stage:t.stage,cx:t.cx,line:t.line,garmentId:t.garmentId,tray:null},g),`task-${t.id}.json`);toast('Task file downloaded');}}
+  else if(act==='rmUpload'){const me=S.participants.find(p=>p.id===S.curUser);if(me&&me.active){const st=me.active.stage;if(me.work&&me.work[st]&&me.work[st].uploads){me.work[st].uploads.splice(+el.dataset.i,1);render();}}}
+  else if(act==='saveWork'){if(CUR_WS)CUR_WS.save();toast('Composition saved to your record');}
+  else if(act==='toggleDistractor'){S.assign.distractors[el.dataset.k]=!S.assign.distractors[el.dataset.k];render();}
+  else if(act==='showAddT'){S.addT=true;S.editingGarmentId=null;S.confirmDel=null;render();}
+  else if(act==='editGarment'){
+    const g=S.garments.find(x=>x.id===id); if(!g) return;
+    S.editingGarmentId=g.id;
+    S.addTData={
+      name:g.name||'', type:g.type||'', cx:g.cx||'s',
+      stages:{pretest:false,s1:false,s2:false,s3:false,posttest:false},
+      fullImg:g.fullImg||null, frontBackImg:g.frontBackImg||null, flatSketchImg:g.flatSketchImg||null,
+      panelImgs:(g.panelImgs||[]).slice(),
+      solutionFile:g.solutionFile||null, solutionFileName:g.solutionFileName||'',
+      arrangementScaffold:g.arrangementScaffold||null,
+      markedSets:(g.markedSets&&g.markedSets.length===2?g.markedSets:[{full:null,frontBack:null,flatSketch:null},{full:null,frontBack:null,flatSketch:null}]).map(ms=>({...ms})),
+      desc:g.desc||''
+    };
+    (g.stages||[]).forEach(s=>{ if(S.addTData.stages.hasOwnProperty(s)) S.addTData.stages[s]=true; });
+    S.addT=true; S.confirmDel=null; render();
+  }
+  else if(act==='cancelAddT'){S.addT=false;S.editingGarmentId=null;render();}
+  else if(act==='setTCx'){captureAddT();S.addTData.cx=el.dataset.k;render();}
+  else if(act==='toggleStage'){captureAddT();S.addTData.stages[el.dataset.k]=!S.addTData.stages[el.dataset.k];render();}
+  else if(act==='clearPanels'){captureAddT();S.addTData.panelImgs=[];render();}
+  else if(act==='submitAddT'){
+    captureAddT();const d=S.addTData;
+    if(!(d.name||'').trim()){toast('Give the garment a name');return;}
+    const stages=Object.keys(d.stages).filter(k=>d.stages[k]);
+    if(!stages.length){toast('Tag at least one stage');return;}
+
+    if(S.editingGarmentId){
+      const g=S.garments.find(x=>x.id===S.editingGarmentId);
+      if(!g){toast('That garment no longer exists');S.addT=false;S.editingGarmentId=null;render();return;}
+      g.name=d.name.trim(); g.type=(d.type||'').trim()||'Garment'; g.cx=d.cx; g.desc=(d.desc||'').trim();
+      g.img=d.fullImg; g.fullImg=d.fullImg; g.frontBackImg=d.frontBackImg; g.flatSketchImg=d.flatSketchImg;
+      g.panelImgs=d.panelImgs.slice(); g.solutionFile=d.solutionFile; g.solutionFileName=d.solutionFileName;
+      g.arrangementScaffold=d.arrangementScaffold;
+      g.markedSets=d.markedSets.map(ms=>({...ms})); g.stages=stages;
+      g.panels=d.panelImgs.length?d.panelImgs.map(()=>'bodice'):['bodice','back'];
+      // Reconcile tasks: drop this garment's existing tasks and recreate them
+      // to match the current stage tags/difficulty, rather than leaving
+      // stale tasks around for stages that got un-tagged.
+      for(let i=TASKS.length-1;i>=0;i--){ if(TASKS[i].garmentId===g.id) TASKS.splice(i,1); }
+      stages.filter(s=>WORKSHOP_STAGES.includes(s)).forEach(s=>{const t={id:'tk'+(TASK_SEQ++),stage:s,cx:d.cx,garmentId:g.id};if(s==='s3')t.line=g.desc||'see garment image';TASKS.push(t);});
+      S.addT=false; S.editingGarmentId=null;
+      S.addTData={name:'',type:'',cx:'s',stages:{pretest:true,s1:true,s2:true,s3:true,posttest:true},fullImg:null,frontBackImg:null,flatSketchImg:null,panelImgs:[],solutionFile:null,solutionFileName:'',arrangementScaffold:null,markedSets:[{full:null,frontBack:null,flatSketch:null},{full:null,frontBack:null,flatSketch:null}],desc:''};
+      render(); toast(`Saved changes to "${g.name}"`);
+      return;
+    }
+
+    const gid='gx'+(GARMENT_SEQ++);
+    const g={id:gid,name:d.name.trim(),type:(d.type||'').trim()||'Garment',cx:d.cx,desc:(d.desc||'').trim(),
+      img:d.fullImg,fullImg:d.fullImg,frontBackImg:d.frontBackImg,flatSketchImg:d.flatSketchImg,
+      panelImgs:d.panelImgs.slice(),solutionFile:d.solutionFile,solutionFileName:d.solutionFileName,
+      arrangementScaffold:d.arrangementScaffold,
+      markedSets:d.markedSets.map(ms=>({...ms})),stages,
+      panels:d.panelImgs.length?d.panelImgs.map(()=>'bodice'):['bodice','back']};
+    S.garments.push(g);
+    stages.filter(s=>WORKSHOP_STAGES.includes(s)).forEach(s=>{const t={id:'tk'+(TASK_SEQ++),stage:s,cx:d.cx,garmentId:gid};if(s==='s3')t.line=g.desc||'see garment image';TASKS.push(t);});
+    S.addT=false;S.addTData={name:'',type:'',cx:'s',stages:{pretest:true,s1:true,s2:true,s3:true,posttest:true},fullImg:null,frontBackImg:null,flatSketchImg:null,panelImgs:[],solutionFile:null,solutionFileName:'',arrangementScaffold:null,markedSets:[{full:null,frontBack:null,flatSketch:null},{full:null,frontBack:null,flatSketch:null}],desc:''};
+    const ws=stages.filter(s=>WORKSHOP_STAGES.includes(s)).length;
+    render();toast(`Added "${g.name}"${ws?` · ${ws} task${ws>1?'s':''} created`:''}`);
+  }
+  else if(act==='askDel'){S.confirmDel=id;render();}
+  else if(act==='cancelDel'){S.confirmDel=null;render();}
+  else if(act==='delGarment'){
+    const gi=S.garments.findIndex(g=>g.id===id);if(gi>-1)S.garments.splice(gi,1);
+    for(let i=TASKS.length-1;i>=0;i--){if(TASKS[i].garmentId===id)TASKS.splice(i,1);}
+    if(S.assign.garmentId===id)S.assign.garmentId=null;
+    if(S.assign.taskId&&(!taskById(S.assign.taskId)))S.assign.taskId=null;
+    S.confirmDel=null;render();toast('Garment deleted');
+  }
+  else if(act==='rmBasicPanel'){BASIC_PANELS.splice(+el.dataset.i,1);render();}
+  else if(act==='delTask'){
+    const i=TASKS.findIndex(t=>t.id===id);if(i>-1)TASKS.splice(i,1);
+    if(S.assign.taskId===id)S.assign.taskId=null;
+    S.confirmDel=null;render();toast('Task deleted');
+  }
+  else if(act==='showPicker'){S.assign.forceShowPicker=true;render();}
+  else if(act==='pkgCxFilter'){S.pkg.viewFilter[el.dataset.stage]=el.dataset.k;render();}
+  else if(act==='pkgPickGarment'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){const plan=ensurePlan(p);plan.stages[el.dataset.stage].garmentId=el.dataset.id;render();}}
+  else if(act==='pkgPickTask'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){const plan=ensurePlan(p);plan.stages[el.dataset.stage].taskId=el.dataset.id;render();}}
+  else if(act==='pkgAutoGarment'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){const stage=el.dataset.stage;const plan=ensurePlan(p);const cfg=plan.stages[stage];const viewCx=S.pkg.viewFilter[stage];let pool=S.garments.filter(gg=>(gg.stages||[]).includes(stage));if(viewCx&&viewCx!=='all')pool=pool.filter(gg=>gg.cx===viewCx);if(!pool.length){toast('No garments tagged for this stage'+(viewCx&&viewCx!=='all'?' at that difficulty':'')+'.');return;}const g=pool[Math.floor(Math.random()*pool.length)];cfg.garmentId=g.id;render();toast('Auto-selected: '+g.name);}}
+  else if(act==='pkgAutoTask'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){const stage=el.dataset.stage;const plan=ensurePlan(p);const cfg=plan.stages[stage];const viewCx=S.pkg.viewFilter[stage];let pool=tasksOf(stage);if(viewCx&&viewCx!=='all')pool=pool.filter(t=>t.cx===viewCx);if(!pool.length){toast('No tasks in this stage yet.');return;}const t=pool[Math.floor(Math.random()*pool.length)];cfg.taskId=t.id;render();toast('Auto-selected: '+garment(t.garmentId).name);}}
+  else if(act==='pkgToggleDistractor'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){const plan=ensurePlan(p);const cfg=plan.stages[el.dataset.stage];cfg.distractors=cfg.distractors||{};cfg.distractors[el.dataset.k]=!cfg.distractors[el.dataset.k];render();}}
+  else if(act==='pkgMode'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){ensurePlan(p).mode=el.dataset.m;render();}}
+  else if(act==='pkgShare'){const p=S.participants.find(x=>x.id===S.pkg.participant);if(p){const plan=ensurePlan(p);plan.share[el.dataset.k]=!plan.share[el.dataset.k];render();}}
+  else if(act==='exportPackage'){exportPackage(id);}
+  else if(act==='tagAllStagesAll'){
+    const ALL=['pretest','s1','s2','s3','posttest'];
+    S.garments.forEach(g=>{
+      g.stages=ALL.slice();
+      for(let i=TASKS.length-1;i>=0;i--){ if(TASKS[i].garmentId===g.id) TASKS.splice(i,1); }
+      ALL.filter(s=>WORKSHOP_STAGES.includes(s)).forEach(s=>{const t={id:'tk'+(TASK_SEQ++),stage:s,cx:g.cx,garmentId:g.id};if(s==='s3')t.line=g.desc||'see garment image';TASKS.push(t);});
+    });
+    render();
+    toast(`${S.garments.length} garment${S.garments.length===1?'':'s'} now tagged for every stage`);
+  }
+  else if(act==='bulkCx'){S.bulkImport.garments[+el.dataset.i].cx=el.dataset.k;render();}
+  else if(act==='bulkTagStage'){S.bulkImport.tagStages[el.dataset.k]=!S.bulkImport.tagStages[el.dataset.k];render();}
+  else if(act==='cancelBulkImport'){S.bulkImport=null;render();}
+  else if(act==='confirmBulkImport'){confirmBulkImport();}
+  else if(act==='activity'){S.assign.activity=el.dataset.k;S.assign.taskId=null;S.assign.garmentId=null;S.assign.cxFilter='all';render();}
+  else if(act==='cxFilter'){S.assign.cxFilter=el.dataset.k;render();}
+  else if(act==='pickTask'){const t=taskById(id);S.assign.taskId=t.id;S.assign.garmentId=t.garmentId;render();}
+  else if(act==='pickGarment'){S.assign.garmentId=id;render();}
+  else if(act==='autoSelect'){
+    const a=S.assign;
+    if(a.activity==='pretest'||a.activity==='posttest'){const g=autoGarment();if(!g){toast('No baseline garments yet — add one via a tagged task first');return;}a.garmentId=g.id;render();toast(`Auto-selected garment: ${g.name}`);}
+    else if(WORKSHOP_STAGES.includes(a.activity)){const pool=a.cxFilter==='all'?tasksOf(a.activity):tasksOf(a.activity).filter(t=>t.cx===a.cxFilter);if(!pool.length){toast('No tasks at this difficulty');return;}const t=pool[Math.floor(Math.random()*pool.length)];a.taskId=t.id;a.garmentId=t.garmentId;render();toast(`Auto-picked ${t.id} · ${cxName(t.cx)}`);}
+  }
+  else if(act==='mode'){S.assign.mode=el.dataset.m;render();}
+  else if(act==='share'){S.assign.share[el.dataset.k]=!S.assign.share[el.dataset.k];render();}
+  else if(act==='activate'){
+    const a=S.assign,p=S.participants.find(x=>x.id===a.participant);
+    let stage=a.activity;
+    let active={stage,mode:a.mode,share:{...a.share}};
+    if(stage==='pretest'||stage==='posttest'){
+      const g=a.garmentId?garment(a.garmentId):autoGarment();
+      if(!g){toast('No baseline garments yet — add one via a tagged task first');return;}
+      active.garmentId=g.id;active.cx=g.cx;
+    }
+    else{
+      let t=a.taskId?taskById(a.taskId):autoTask(stage);
+      if(!t){toast('No tasks in this stage yet — create one first');return;}
+      active.taskId=t.id;active.garmentId=t.garmentId;active.cx=t.cx;active.line=t.line;
+    }
+    if(stage!=='pretest'&&stage!=='posttest'||stage==='pretest'||stage==='posttest'){
+      const dg=(['pretest','s1'].includes(stage))?Object.keys(a.distractors||{}).filter(k=>a.distractors[k]&&k!==active.garmentId).map(garment).filter(Boolean):[];
+      if(stage==='pretest'||stage==='posttest'){
+        active.tray=buildTrayFromDescs(descFromBasicPanels(),dg);
+      } else {
+        const mainG=garment(active.garmentId);
+        active.tray=buildTray(mainG,dg);
+      }
+      active.distractors=dg.map(x=>x.name);
+      p.work=p.work||{};p.work[stage]={tray:active.tray.map(d=>({label:d.label,from:d.from})),uploads:(p.work[stage]&&p.work[stage].uploads)||[],scaffolds:(p.work[stage]&&p.work[stage].scaffolds)||{},presentedAt:new Date().toISOString()};
+    }
+    p.active=active;active.current='task';const k=stagePhaseKey(stage);if(p.progress[k]!==undefined)p.progress[k]='active';
+    p.notify=false;
+    S.assign.taskId=null;S.assign.garmentId=null;S.assign.forceShowPicker=false;
+    render();toast(`Activated ${stage.toUpperCase()} for ${p.name} → live in their view`);
+  }
+  else if(act==='saveFindings'){const p=S.participants.find(x=>x.id===id);const ta=$('#findArea');if(ta)p.findings=ta.value;render();toast('Findings saved');}
+  else if(act==='newLogin'){const v=$('#newName').value.trim();if(!v){toast('Enter a name to begin');return;}
+    const nm=v.split('—')[0].trim()||v, dt=v.split('—')[1]?v.split('—')[1].trim():'new';
+    const newId='SI-'+String(S.participants.length+1).padStart(2,'0');
+    S.participants.push({id:newId,code:newId,name:nm,email:'',phone:'',detail:dt,mode:'physical',consent:{given:false},progress:progressTo(-1,-1),notify:false,active:null,findings:'',arts:0});
+    S.curUser=newId;S.pstage='task';render();toast('Welcome! Please complete consent to begin.');}
+  else if(act==='clearSig'){const c=$('#sigpad');if(c&&c._clear)c._clear();}
+  else if(act==='submitConsent'){
+    const me=S.participants.find(p=>p.id===S.curUser);
+    const rec=document.querySelector('input[name="rec"]:checked');
+    const age=$('#cAge').value.trim(),bg=$('#cBg').value.trim(),agree=$('#cAgree').checked,printn=$('#cPrint').value.trim();
+    if(!age||!bg){toast('Please fill age and educational background');return;}
+    if(!rec){toast('Please choose your recording preference');return;}
+    if(!agree){toast('Please tick the consent statement');return;}
+    if(!printn){toast('Please print your name to confirm');return;}
+    me.consent={given:true,recording:rec.value,name:$('#cName').value.trim()||me.name,age,bg,exp:$('#cExp').value,print:printn,date:$('#cDate').value,signed:!!($('#sigpad')&&$('#sigpad')._has&&$('#sigpad')._has())};
+    if($('#cName').value.trim())me.name=$('#cName').value.trim();
+    render();toast('Consent recorded — thank you. Waiting for the researcher to activate a task.');
+  }
+  else if(act==='completeTask'){
+    const me=S.participants.find(p=>p.id===S.curUser),a=me.active;
+    const ups=(me.work&&me.work[a.stage]&&me.work[a.stage].uploads)||[];
+    if(!ups.length && !S['warned_'+a.stage]){S['warned_'+a.stage]=true;toast('No solution uploaded yet — click again to complete anyway');return;}
+    S['warned_'+a.stage]=false;
+    const k=stagePhaseKey(a.stage);if(me.progress[k]!==undefined)me.progress[k]='done';me.arts++;
+    a.current='waiting';me.notify=true;render();toast('Task submitted · your researcher will continue');
+  }
+  else if(act==='submitInstr'){
+    const me=S.participants.find(p=>p.id===S.curUser),a=me.active,st=a.stage,def=instrDef('survey',st);
+    if(!me.surveys)me.surveys={};
+    me.surveys[st]={title:def.title,submittedAt:new Date().toISOString(),responses:readSurvey(def)};
+    const pk=surveyPhaseKey(st);if(pk&&me.progress[pk]!==undefined)me.progress[pk]='done';
+    a.current='waiting';me.notify=true;render();toast('Survey submitted → researcher notified');
+  }
+  else if(act==='setCurrent'){const p=S.participants.find(x=>x.id===el.dataset.pid);if(p&&p.active){p.active.current=el.dataset.k;render();toast(`Participant now sees: ${INSTR_TITLE[el.dataset.k]||'Task'}`);}}
+  else if(act==='markInstr'){const p=S.participants.find(x=>x.id===el.dataset.pid);if(!p||!p.active)return;const k=el.dataset.k,st=p.active.stage;
+    const pk=k==='task'?stagePhaseKey(st):instrPhaseKey(k,st);if(pk&&p.progress[pk]!==undefined)p.progress[pk]='done';
+    if(RESEARCHER_LED[k]){const map=INSTR_KIND[k];if(!p[map])p[map]={};const note=$('#note_'+k);p[map][st]={conductedAt:new Date().toISOString(),notes:note?note.value:''};}
+    if(p.active.current===k)p.active.current='waiting';render();toast(`${INSTR_TITLE[k]||'Task'} marked complete`);}
+  else if(act==='endSession'){const p=S.participants.find(x=>x.id===el.dataset.pid);if(p){p.active=null;p.notify=false;render();toast('Session ended · participant released');}}
+});
+
+root.addEventListener('change',e=>{
+  if(e.target.id==='assignP'){S.assign.participant=e.target.value||null;S.assign.forceShowPicker=false;render();}
+  if(e.target.id==='pkgP'){S.pkg.participant=e.target.value||null;render();}
+  if(e.target.id==='bulkImportInput'){handleBulkImportFiles(e.target.files);}
+  if(e.target.dataset&&e.target.dataset.act==='bulkRename'){const bi=S.bulkImport;if(bi)bi.garments[+e.target.dataset.i].name=e.target.value;}
+  if(e.target.id==='anaSel'){S.selParticipant=e.target.value||null;render();}
+  if(e.target.id==='atFullImg'){const f=e.target.files[0];if(f){captureAddT();readImg(f).then(d=>{S.addTData.fullImg=d;render();}).catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err));});}}
+  if(e.target.id==='atFBImg'){const f=e.target.files[0];if(f){captureAddT();readImg(f).then(d=>{S.addTData.frontBackImg=d;render();}).catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err));});}}
+  if(e.target.id==='atFlatImg'){const f=e.target.files[0];if(f){captureAddT();readImg(f).then(d=>{S.addTData.flatSketchImg=d;render();}).catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err));});}}
+  if(e.target.id==='atMarkedImg'){/* legacy id no longer used */}
+  if(e.target.id&&e.target.id.indexOf('atMarked_')===0){
+    const m=e.target.id.match(/^atMarked_(\d)_(full|fb|flat)$/);
+    if(m){const f=e.target.files[0];if(f){captureAddT();const idx=+m[1],slot=m[2]==='fb'?'frontBack':m[2]==='flat'?'flatSketch':'full';
+      readImg(f).then(dUrl=>{S.addTData.markedSets[idx][slot]=dUrl;render();}).catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err));});}}
+  }
+  if(e.target.id==='atSolution'){const f=e.target.files[0];if(f){
+    if(f.size>25*1024*1024)toast(`That PDF is ${(f.size/1024/1024).toFixed(1)}MB — this may take a moment.`);
+    captureAddT();
+    readImg(f).then(d=>{S.addTData.solutionFile=d;S.addTData.solutionFileName=f.name;render();toast('Solution file attached: '+f.name);})
+      .catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err)+'\n\nTry re-exporting the PDF (a fresh export sometimes resolves this), or a smaller/simplified version if it\'s very large.');});
+  }}
+  if(e.target.id==='atArrangementScaffold'){const f=e.target.files[0];if(f){captureAddT();readImg(f).then(d=>{S.addTData.arrangementScaffold=d;render();toast('Arrangement scaffold attached: '+f.name);}).catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err));});}}
+  if(e.target.id&&e.target.id.indexOf('scf_')===0){const parts=e.target.id.split('_');const key=parts[1];const pid=parts.slice(2).join('_');const p=S.participants.find(x=>x.id===pid);const f=e.target.files[0];if(p&&p.active&&f){const st=p.active.stage;p.work=p.work||{};p.work[st]=p.work[st]||{};p.work[st].scaffolds=p.work[st].scaffolds||{};readImg(f).then(d=>{p.work[st].scaffolds[key]={label:e.target.dataset.role||key,name:f.name,type:f.type,dataUrl:d};render();toast('Scaffold added — participant can now see it');}).catch(err=>{console.error(err);alert('Could not read "'+f.name+'": '+(err&&err.message||err));});}}
+  if(e.target.id==='solUpload'){const me=S.participants.find(p=>p.id===S.curUser);if(me&&me.active){const st=me.active.stage;const fs=[...e.target.files];if(fs.length){me.work=me.work||{};me.work[st]=me.work[st]||{uploads:[]};me.work[st].uploads=me.work[st].uploads||[];Promise.all(fs.map(f=>readImg(f).then(d=>({name:f.name,type:f.type,size:f.size,dataUrl:d,at:new Date().toISOString()})))).then(arr=>{me.work[st].uploads=me.work[st].uploads.concat(arr);render();toast(`${arr.length} file${arr.length>1?'s':''} uploaded`);}).catch(err=>{console.error(err);alert('One of those files could not be read: '+(err&&err.message||err)+'\n\nTry uploading them one at a time to find which one is the problem.');});}}}
+  if(e.target.id==='atPImgs'){const fs=[...e.target.files];if(fs.length){captureAddT();Promise.all(fs.map(readImg)).then(arr=>{S.addTData.panelImgs=S.addTData.panelImgs.concat(arr);render();}).catch(err=>{console.error(err);alert('One of those panel images could not be read: '+(err&&err.message||err));});}}
+  if(e.target.id==='atBasicPanels'){const fs=[...e.target.files];if(fs.length){Promise.all(fs.map(readImg)).then(arr=>{BASIC_PANELS=BASIC_PANELS.concat(arr);render();toast(`${arr.length} panel${arr.length>1?'s':''} added to the basic set`);}).catch(err=>{console.error(err);alert('One of those panel images could not be read: '+(err&&err.message||err));});}}
+});
+
+render();
+</script>
+</body>
+</html>
