@@ -1,0 +1,2336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flat⇄Form · Participant</title>
+<!-- Panel Studio's own CDN deps, now loaded here since it's a native module
+     instead of a separate document (see panel-studio-module.js/.css). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link rel="stylesheet" href="panel-studio-module.css?v=8">
+<style>
+  /* ── Presentation-layer restyle only (Claude Design "Task Flow" reference).
+     No render() dispatch logic, schema, or Panel Studio protocol changes —
+     see the render*() functions below for what moved/stayed and why. ── */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --ink:#171512; --ink-faint:#8a8578; --line:#e6e2d8; --bg:#faf9f6; --card:#fff;
+    --accent:#d6473c; --green:#1a7f37; --physical:#f2d9d9; --physical-ink:#a33;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;}
+  #root{display:grid;grid-template-columns:300px 1fr;min-height:100vh;}
+  @media (max-width:820px){ #root{grid-template-columns:1fr;} }
+  .ff-solo{grid-column:1/-1;max-width:640px;margin:0 auto;padding:48px 24px 80px;}
+  .ff-header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 32px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap;}
+  .ff-pagehead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:24px;padding-bottom:14px;border-bottom:2px solid var(--ink);flex-wrap:wrap;}
+  .ff-pagehead-title{font-size:22px;font-weight:800;letter-spacing:-.01em;}
+  .ff-pagehead-trail{font-size:12px;font-weight:600;color:var(--ink-faint);}
+  .ff-rail{grid-column:1;padding:28px 24px;border-right:1px solid var(--line);background:var(--card);}
+  .ff-main{grid-column:2;padding:28px 40px;min-width:0;}
+  /* Landing / welcome screens (import + verify) */
+  .land-hero{grid-column:1/-1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 24px;}
+  .land-hero .brand{font-size:22px;margin-bottom:28px;}
+  .land-hero h1{font-size:40px;margin-bottom:14px;}
+  .land-hero p.sub{max-width:480px;margin:0 auto 32px;font-size:15px;}
+  .land-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:32px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(23,21,18,.06);}
+  .land-dropzone{border:1.5px dashed var(--line);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;}
+  .land-dropzone:hover{border-color:var(--accent);background:#fdf6f5;}
+  .land-dropzone .ico{font-size:28px;margin-bottom:10px;}
+  .land-identity{display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg);border-radius:10px;margin-bottom:20px;}
+  .land-identity .avatar{width:44px;height:44px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;}
+  .brand{font-weight:800;font-size:17px;letter-spacing:-.01em;margin-bottom:20px;}
+  .brand .sep{color:var(--ink-faint);font-weight:400;}
+  /* App name and participant name given equal typographic weight — two
+     independently important pieces of information, not a title+caption. */
+  .ff-header-brand{display:flex;align-items:baseline;gap:16px;}
+  .ff-header-app{font-weight:800;font-size:18px;letter-spacing:-.01em;}
+  .ff-header-participant{font-weight:800;font-size:18px;letter-spacing:-.01em;padding-left:16px;border-left:2px solid var(--line);}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px;}
+  .eyebrow.accent{color:var(--accent);}
+  .big-frac{font-size:38px;font-weight:800;line-height:1;}
+  .big-frac .of{color:var(--ink-faint);font-weight:400;}
+  .progressbar{height:4px;background:var(--line);border-radius:2px;margin:14px 0 20px;overflow:hidden;}
+  .progressbar>i{display:block;height:100%;background:var(--ink);}
+  .rail-note{font-size:12px;color:var(--ink-faint);margin-top:18px;line-height:1.5;}
+  .rail-foot{margin-top:24px;padding-top:18px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;}
+  /* Training Task — deliberately styled apart from .stage-list (dashed
+     border, no numbering, no progress accent) so it reads as optional
+     interface practice, never as one of the assigned research stages. */
+  .training-block{margin-top:18px;padding:14px;border:1.5px dashed var(--line);border-radius:10px;}
+  .training-eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);}
+  .training-desc{font-size:12px;color:var(--ink-faint);margin-top:2px;margin-bottom:10px;}
+  .training-done{font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px;}
+  h1{font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-.01em;}
+  h2{font-size:15px;font-weight:700;margin-bottom:8px;}
+  p.sub{color:var(--ink-faint);font-size:14px;margin-bottom:16px;line-height:1.6;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;}
+  hr.rule{border:none;border-top:1px solid var(--line);margin:20px 0;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .btn:hover{border-color:#bbb;}
+  .btn.blue{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.green{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .btn.ghost{background:none;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.block{width:100%;justify-content:center;}
+  .row{display:flex;align-items:center;gap:10px;}
+  .spacer{flex:1;}
+  .faint{color:var(--ink-faint);}
+  .mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;}
+  input[type=file]{font-size:13px;}
+  textarea,input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fdfdfc;}
+  textarea{min-height:90px;resize:vertical;}
+  .stage-list{display:flex;flex-direction:column;}
+  .stage-row{display:flex;align-items:center;gap:10px;padding:12px 4px;border-left:2px solid transparent;border-bottom:1px solid var(--line);cursor:pointer;}
+  .stage-row:last-child{border-bottom:none;}
+  .stage-row.current{border-left-color:var(--accent);}
+  .stage-row.locked{opacity:.45;cursor:default;}
+  .stagenum{font-size:11px;font-weight:700;color:var(--ink-faint);width:20px;flex-shrink:0;}
+  .stage-row.done .stagenum{color:var(--ink);}
+  .stage-row-name{flex:1;font-size:14px;font-weight:600;}
+  .stage-row.done .stage-row-name::after{content:' ✓';color:var(--green);}
+  .stage-row-time{font-size:11px;color:var(--ink-faint);white-space:nowrap;}
+  .scaffold-imgs{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;}
+  .scaffold-imgs figure{text-align:center;}
+  .scaffold-imgs img{height:150px;max-width:230px;object-fit:contain;border:1px dashed var(--line);border-radius:8px;background:#fafaf8;padding:8px;}
+  .scaffold-imgs figcaption{font-size:11px;color:var(--ink-faint);margin-top:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .qgroup{border-top:1px solid var(--line);padding-top:16px;margin-top:16px;}
+  .qgroup:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .qtitle{font-weight:800;font-size:clamp(24px,2.6vw,34px);line-height:1.3;margin-bottom:40px;letter-spacing:-.015em;}
+  .likert{display:flex;align-items:center;gap:28px;margin-top:8px;}
+  .likert .end{font-size:13px;color:var(--ink-faint);width:110px;line-height:1.45;}
+  .likert .opts{display:flex;gap:26px;flex:1;justify-content:center;}
+  .likert label{display:flex;flex-direction:column;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-faint);cursor:pointer;}
+  .likert .sv-likert-circle{width:68px;height:68px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--ink-faint);background:#fff;transition:border-color .15s,background .15s,color .15s,transform .1s;}
+  .likert label:hover .sv-likert-circle{border-color:var(--accent);transform:translateY(-2px);}
+  .likert label:has(input:checked) .sv-likert-circle{background:var(--accent);border-color:var(--accent);color:#fff;transform:scale(1.04);}
+  .likert input{position:absolute;opacity:0;width:1px;height:1px;}
+  .optlist{display:flex;flex-direction:column;gap:12px;margin-top:8px;}
+  .optlist label{display:flex;align-items:center;gap:14px;font-size:16px;cursor:pointer;padding:20px 24px;border:1.5px solid var(--line);border-radius:14px;transition:border-color .15s,background .15s,transform .1s;}
+  .optlist label:hover{border-color:#ccc;transform:translateY(-1px);}
+  .optlist label:has(input:checked){border-color:var(--accent);background:#fdf1f0;font-weight:600;}
+  .optlist input[type=radio],.optlist input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;}
+  .likert-labeled .sv-likert-label{font-size:11px;color:var(--ink-faint);text-align:center;max-width:80px;line-height:1.25;}
+  .likert-labeled label:has(input:checked) .sv-likert-label{color:var(--accent);font-weight:600;}
+  .opt-other{flex-wrap:wrap;}
+  .opt-other .other-input{display:none;flex-basis:100%;margin-left:34px;width:calc(100% - 34px);max-width:400px;font-size:14px;font-weight:400;padding:10px 13px;border:1.5px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  .opt-other:has(input:checked) .other-input{display:block;}
+  .refq{font-size:13px;padding:6px 0;color:#333;}
+  .refq b{color:var(--ink-faint);font-weight:600;}
+  .badge{display:inline-block;padding:4px 12px;border-radius:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#f2f0ea;color:var(--ink);border:1px solid var(--line);}
+  .trail{display:flex;align-items:center;gap:0;margin-bottom:14px;}
+  .trail.compact{margin-bottom:0;}
+  .trail-node{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .trail-circle{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0;background:var(--bg);color:var(--ink-faint);border:1px solid var(--line);}
+  .trail-circle.done{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .trail-circle.current{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .trail.compact .trail-circle{width:18px;height:18px;font-size:9px;}
+  .trail-node-label{font-size:10px;color:var(--ink-faint);white-space:nowrap;}
+  .trail-node-label.on{color:var(--ink);font-weight:700;}
+  .trail-connector{flex:1;height:1px;background:var(--line);margin:0 4px;align-self:center;transform:translateY(-8px);}
+  .trail.compact .trail-connector{transform:translateY(-5px);margin:0 3px;}
+  .microstep{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-faint);margin-bottom:16px;}
+  .microstep .on{color:var(--accent);font-weight:700;}
+  .microstep .sep{color:var(--line);}
+  .screen{animation:screenFade .22s ease;}
+  @keyframes screenFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  .dropzone{border:1.5px dashed #ccc;border-radius:12px;padding:40px 20px;text-align:center;color:var(--ink-faint);cursor:pointer;}
+  .dropzone:hover{border-color:var(--accent);color:var(--accent);}
+  .filelist{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+  .filerow{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 10px;background:var(--bg);border-radius:8px;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+  .stepnote{background:#fdf6e3;border:1px solid #f0e4a0;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px;}
+  /* One-question-at-a-time survey flow — a full-bleed, immersive screen of
+     its own (like the landing/welcome screens), deliberately decoupled from
+     the dashboard/tab-strip chrome that wraps the rest of the app. */
+  /* height:100vh + overflow:hidden (not min-height) is deliberate — the
+     whole shell must never scroll (that's the bug being fixed). Any
+     question whose content is taller than the fixed-height card scrolls
+     internally within .sv-qbody instead; .sv-nav sits outside that
+     scrolling region so it never moves. */
+  .sv-shell{grid-column:1/-1;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:var(--bg);}
+  .sv-toprogress{height:4px;background:var(--line);width:100%;flex-shrink:0;}
+  .sv-toprogress>i{display:block;height:100%;background:var(--accent);transition:width .35s ease;}
+  .sv-topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 32px;flex-shrink:0;}
+  .sv-topbar .brand{margin-bottom:0;font-size:15px;color:var(--ink-faint);font-weight:700;}
+  .sv-exit-link{font-size:13px;font-weight:600;color:var(--ink-faint);cursor:pointer;padding:6px 4px;}
+  .sv-exit-link:hover{color:var(--accent);}
+  .sv-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px 24px 32px;}
+  .sv-card{position:relative;width:100%;max-width:760px;height:min(780px,100%);display:flex;flex-direction:column;padding:44px 64px 24px;animation:svIn .4s cubic-bezier(.2,.8,.2,1);}
+  /* Question 7's rank UI can hold up to 7 bucket rows plus its chip row —
+     denser than any other question type — so it gets a tighter title/
+     eyebrow margin to leave it more room, keeping "all ranked items visible
+     without scrolling" true in the worst case (every option selected). */
+  .sv-card:has(.rank-q) .qtitle{margin-bottom:18px;}
+  .sv-card:has(.rank-q) .sv-eyebrow-row{margin-bottom:10px;}
+  .sv-card.leaving{animation:svOut .18s ease forwards;}
+  @keyframes svIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes svOut{to{opacity:0;transform:translateY(-10px) scale(.98)}}
+  .sv-qbody{flex:1;min-height:0;overflow-y:auto;}
+  .sv-eyebrow-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+  .sv-stage-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);}
+  .sv-qcount{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);}
+  /* Anchored footer, always the same height and screen position regardless
+     of question content — never part of the scrolling .sv-qbody above. */
+  .sv-nav{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:24px;border-top:1px solid var(--line);}
+  .sv-nav .btn{padding:14px 26px;font-size:15.5px;}
+  .sv-card.sv-complete{align-items:center;justify-content:center;text-align:center;padding:32px 64px;}
+  .sv-complete .ico{font-size:46px;margin-bottom:6px;}
+  .sv-complete-title{font-size:27px;font-weight:800;letter-spacing:-.01em;}
+  /* Question 7 (pretest/post-test) — select difficult panels, then drag
+     within the bucket to rank them most→least difficult. Answer storage is
+     the same ordered-array shape as a plain multi-select. */
+  .rank-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px;}
+  .rank-chip{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;transition:border-color .15s,background .15s;}
+  .rank-chip:hover{border-color:#ccc;}
+  .rank-chip.on{border-color:var(--accent);background:#fdf1f0;font-weight:600;}
+  .rank-chip input{width:14px;height:14px;accent-color:var(--accent);}
+  .rank-bucket-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin:12px 0 6px;}
+  .rank-empty{font-size:13px;margin-top:14px;}
+  .rank-bucket{display:flex;flex-direction:column;gap:5px;}
+  .rank-item{display:flex;align-items:center;gap:10px;padding:6px 14px;border:1.5px solid var(--line);border-radius:9px;background:#fff;cursor:grab;}
+  .rank-item:active{cursor:grabbing;}
+  .rank-num{width:19px;height:19px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .rank-label{flex:1;font-size:13.5px;font-weight:600;}
+  .rank-handle{color:var(--ink-faint);font-size:14px;cursor:grab;}
+  /* Brief page's finite-state workflow, as an integrated dashboard — two
+     side-by-side action cards (Studio/Survey) plus one banner for the
+     final Complete-stage action, instead of a stacked vertical list. */
+  .brief-top{margin-bottom:20px;}
+  .brief-top-grid{display:grid;grid-template-columns:1fr 220px;gap:28px;align-items:center;}
+  .brief-intro{font-size:15.5px;line-height:1.6;font-weight:500;color:var(--ink);margin:0 0 16px;}
+  .brief-steps{margin:0;padding:0;list-style:none;counter-reset:briefstep;}
+  .brief-steps li{counter-increment:briefstep;position:relative;padding-left:34px;font-size:14.5px;line-height:1.5;color:var(--ink);margin-bottom:10px;}
+  .brief-steps li:last-child{margin-bottom:0;}
+  .brief-steps li::before{content:counter(briefstep);position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .brief-reminder{margin-top:18px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px;font-style:italic;color:var(--ink-faint);line-height:1.5;}
+  .brief-task-img{width:100%;max-height:190px;object-fit:contain;display:block;border:1px solid var(--line);border-radius:8px;background:#fafaf8;padding:10px;}
+  @media (max-width:720px){ .brief-top-grid{grid-template-columns:1fr;} }
+  .wf-row{display:flex;gap:20px;align-items:stretch;margin-bottom:16px;}
+  .wf-card{flex:1;min-width:0;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;}
+  .wf-card.current{border-color:var(--accent);box-shadow:0 2px 14px rgba(214,71,60,.08);}
+  .wf-card.locked{opacity:.55;}
+  .wf-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .wf-card-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;border:2px solid var(--line);color:var(--ink-faint);background:#fff;}
+  .wf-card.done .wf-card-icon{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .wf-card.current .wf-card-icon{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .wf-card-title{font-weight:700;font-size:16px;}
+  .wf-card-status{font-size:13px;color:var(--ink-faint);line-height:1.55;margin-bottom:14px;}
+  .wf-card-action{margin-top:auto;}
+  .wf-card-action .btn.block{width:100%;justify-content:center;}
+  .wf-uploads{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+  .wf-uploads-head{display:flex;align-items:center;justify-content:space-between;}
+  .wf-uploads-label{font-size:11.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .wf-uploads-add{font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;}
+  .wf-uploads .filelist{margin-top:8px;}
+  .wf-complete-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);}
+  .wf-complete-banner.ready{border-color:var(--green);background:#f2f9f2;}
+  .wf-complete-banner.locked{opacity:.6;}
+  .wf-complete-banner.done{border-color:var(--ink);background:#f7f6f3;}
+  .wf-complete-text{font-size:14px;line-height:1.6;}
+  /* Stage-completion interstitial */
+  #ps-container{display:none;position:fixed;inset:0;z-index:500;background:#fff;flex-direction:column;}
+  #ps-native-root{flex:1;width:100%;overflow:hidden;position:relative;}
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js" onload="window._lucideLoaded=true; if(window.lucide) lucide.createIcons();" onerror="console.warn('Lucide icon library failed to load from CDN — toolbar icons will be blank until this loads. Check network access.');"></script>
+<script src="panel-studio-module.js?v=13"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Panel Studio, mounted natively in-page (no iframe — see
+     panel-studio-module.js) — this container is never touched by render()'s
+     innerHTML replacement, so its work-in-progress stays intact across
+     every other interaction on the page. Visibility is toggled directly,
+     not re-rendered. PanelStudio.mount() injects into #ps-native-root once
+     and is never re-mounted, so switching tabs away and back preserves it.
+     No outer topbar here on purpose — Panel Studio's own studio-header
+     (title/stage badge/progress/timer/Finish) is the only chrome above the
+     workspace; the participant's sole way out is confirming Finish. -->
+<div id="ps-container">
+  <div id="ps-native-root"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════
+//  DATA: survey / prompt / interview question banks — mirrors the
+//  Workshop Console's definitions so this page can stand completely alone.
+// ════════════════════════════════════════
+// Shared 5-point scale used by every Likert question below — each point
+// carries its own label (not just the two endpoints), rendered under its
+// radio circle by surveyFormHTML(). ends[] stays for code that only wants
+// the two extremes (e.g. Console's trend-bar captions); labels[] is the
+// full 5-point set, index 0..4 matching stored values 1..5.
+const L5 = ['Very Difficult','Difficult','Neither Easy nor Difficult','Easy','Very Easy'];
+const L5_CHANGE = ['Not at all','Slightly','Moderately','A lot','Very significantly'];
+const L5_CONF = ['Very Low','Low','Moderate','High','Very High'];
+const likert5 = (q) => ({t:'likert', q, ends:[L5[0],L5[4]], labels:L5});
+// ── Pre-study survey (Survey Revision, item 1) — a short, workshop-level
+// instrument shown once, right after Welcome and before the first assigned
+// activity. Answered into PKG.preStudy (see surveyAnswersFor()), the same
+// pattern PKG.finalReflection already established for a survey with no
+// stage/garment/Studio activity behind it. Gated on PKG.share.survey, same
+// convention as every other survey in this app. ──
+const PRESTUDY_DEF = {
+  title:'Before you begin',
+  intro:{
+    narrative:'Before starting the workshop activities, we\'d like to know a little about your background and expectations.',
+    steps:[
+      'Answer a few short questions about your prior experience.',
+      'There are no right or wrong answers here — just tell us what\'s true for you.',
+      'This takes about a minute, then you\'ll move straight into your first activity.',
+    ],
+    reminder:'Your answers help the research understand what participants bring into the workshop — they don\'t affect which activities you\'re assigned.',
+  },
+  qs:[
+    {t:'single',q:'How familiar are you with CLO3D?',opts:['Never used it','Beginner','Intermediate','Advanced','Expert']},
+    {t:'likert',q:'How confident are you in your patternmaking skills?',ends:[L5_CONF[0],L5_CONF[4]],labels:L5_CONF},
+    {t:'likert',q:'How confident are you in constructing a garment from its panels?',ends:[L5_CONF[0],L5_CONF[4]],labels:L5_CONF},
+    {t:'single',q:'Before beginning, which medium do you expect will help you most with the workshop tasks?',opts:['Paper','CLO3D','Panel Studio','A combination of these','Not sure']},
+    {t:'single',q:'Before beginning, what do you expect will be the easiest way for you to approach the workshop tasks?',opts:['Working from the garment image','Working from individual panels','Working from a panel arrangement','Using 3D construction','Not sure']},
+    {t:'multi',q:'Which of the following have you previously used for garment/pattern development?',opts:['Paper patterns','Digital patternmaking','CLO3D or similar 3D software','Physical garment construction','None of these']},
+  ]
+};
+const SURVEYDEF = {
+  pretest:{title:'Reflection — pre-test',sub:'Tell us how you experienced the test.',qs:[
+    likert5('How easy or difficult was it to complete this task?'),
+    {t:'multi',q:'What were the most challenging parts of this task?',opts:['Understanding the garment shape','Determining the panel shapes','Visualising how panels relate to the garment','Visualising the garment in 3D','Drawing the panels','Other']},
+    {t:'single',q:'How confident were you while attempting this task?',opts:['Not at all confident','Slightly confident','Moderately confident','Very confident','Extremely confident']},
+    {t:'multi',q:'Which strategies did you use while working on this task?',opts:['Visualising the whole garment','Visualising one panel at a time','Using previous patternmaking knowledge','Trial and error','Comparing the panel with the garment','Other']},
+    {t:'rank',q:'Rank the garment parts according to how difficult they were to visualise, from most difficult to least difficult.',opts:['Bodice','Sleeve','Collar','Skirt panel','Yoke']},
+    {t:'multi',q:'How did you judge whether your solution was appropriate?',opts:['Mental visualisation','Previous knowledge','Trial and error','Comparing with the garment','Guessing','Other']},
+    {t:'open',q:'Was there anything else about how you approached this task that you would like to describe?'},
+  ]},
+  s1:{title:'Survey — Stage 1 · Identify, Create and Arrange Panels',sub:'About identifying, creating and arranging panels.',qs:[
+    {t:'multi',q:'How did you identify the panels you needed?',opts:['Matching the garment shape','Recognising seam or style lines','Using previous patternmaking knowledge','Trial and elimination','Visualising the garment']},
+    {t:'multi',q:'Which features helped you most while identifying or creating panels?',opts:['Seam/style lines','Garment silhouette','Symmetry','Fold/dart positions','Joining edges','Other']},
+    likert5('How easy or difficult was it to arrange the panels?'),
+    {t:'multi',q:'Which additional references or hints did you find useful?',opts:['Garment image','Flat sketch','Half panel arrangement','Individual panels','Other reference','None']},
+    {t:'multi',q:'Which approaches did you use?',opts:['Mental rotation','Imagining folding/unfolding','Imagining how panels would join','Comparing with the garment image','Patternmaking knowledge','Other']},
+    {t:'multi',q:'What difficulties did you experience?',opts:['Understanding panel shape','Drawing shapes','Curves','Size/scale','Orientation','Other']},
+    {t:'multi',q:'How did you judge whether your panel arrangement was appropriate?',opts:['Mental visualisation','Previous knowledge','Comparing with the garment','Trial and error','Other']},
+  ]},
+  s2:{title:'Survey — Stage 2 · Construct the Garment',sub:'About constructing the garment from the given panels.',qs:[
+    {t:'rank',q:'How did you begin constructing the garment? Rank the approaches you used, from the approach you relied on most to least.',opts:['Visualising the whole garment','Starting with a key panel','Following a known construction sequence','Trial and error','Referring to the garment image']},
+    {t:'rank',q:'Which panels did you work with first? Rank the following according to the order in which you used them.',opts:['Front bodice','Back bodice','Sleeve','Collar','Other']},
+    likert5('How easy or difficult was it to construct the garment from the given panels?'),
+    {t:'multi',q:'Which references or hints did you find useful?',opts:['Garment image','Flat sketch','Panel arrangement','Individual panels','Other reference','None']},
+    {t:'single',q:'Which statement best describes your interaction with CLO3D during this task?',opts:['I already knew how to use it.','I knew the basics but had to recall commands.','I spent considerable effort figuring out the interface.','The interface affected my ability to focus on the spatial task.','The interface did not affect my thinking.']},
+    {t:'multi',q:'What difficulties did you experience?',opts:['Panel placement','Scaling','Sewing','Rotation/orientation','Simulation','Other']},
+    {t:'multi',q:'Which activities did you perform while constructing the garment?',opts:['Scaling','Rotation','Moving/rearranging panels','Sewing','Simulation','Other']},
+    // Avatar question (Survey Revision, item 9) — kept to a single overall
+    // rating rather than four separate Likert scales (one per aspect) to
+    // avoid inventing a new "matrix" response type and to keep this stage
+    // at 8 questions rather than 11; the four aspects are named in the
+    // question text itself instead.
+    {t:'likert',q:'How useful was the 3D avatar while constructing the garment — for understanding panel locations, garment shape, body orientation, and how the panels come together?',ends:['Not at all useful','Extremely useful'],labels:['Not at all useful','Slightly useful','Moderately useful','Very useful','Extremely useful']},
+  ]},
+  s3:{title:'Survey — Stage 3 · Develop the Style-line Panel',sub:'About developing the panel around the style line.',qs:[
+    likert5('How easy or difficult was it to understand the highlighted portion of the garment?'),
+    {t:'multi',q:'Which approaches did you use?',opts:['Mental rotation','Imagining folding/unfolding','Imagining sewing','Visualising hidden surfaces','Patternmaking knowledge','Other']},
+    {t:'multi',q:'What was difficult about this task?',opts:['Understanding the 3D form','Identifying the panel boundary','Flattening the form into 2D','Drawing the panel','Checking the panel','Other']},
+    {t:'multi',q:'Which aspects were you paying most attention to?',opts:['Shape','Size/scale','Curvature','Style line','Surface continuity','Other']},
+    {t:'multi',q:'Which additional references or hints did you find useful?',opts:['Garment image','Flat sketch','Half panel arrangement','Full panel arrangement','Individual panels','None']},
+    {t:'multi',q:'How did you judge whether your solution was appropriate?',opts:['Mental visualisation','Previous knowledge','Trial and error','Comparing with the garment','Comparing with the panel arrangement']},
+    {t:'open',q:'What was the most difficult part of developing this panel?'},
+  ]},
+};
+// Post-test intentionally reuses the Pre-test survey verbatim (same
+// questions/options/order) so responses can be compared directly — per
+// explicit instruction, the Post-test must stay a directly comparable
+// instrument, not a different survey.
+SURVEYDEF.posttest = Object.assign({},SURVEYDEF.pretest,{title:'Reflection — post-test',sub:'Tell us how you experienced the closing test.'});
+
+const PROMPTDEF = {
+  s1:{title:'Think-aloud · Stage 1',groups:[
+    {h:'Selection of panels',qs:['How many panels did you observe the garment is having?','What different types of panels are required to construct the garment?','What features in each of these panels help you identify its type?','What is the purpose of an on-fold panel?']},
+    {h:'Creation of new panels',qs:['Will you reflect an existing panel shape to create a new panel?','Will you consider surrounding edges to decide the new panel\'s edges?','Will you modify the sleeve panel based on its joining position with the top panels?','Will you modify the panel to incorporate the folds and gatherings?']},
+    {h:'Arrangement of panels',qs:['Are there any conventions to follow to arrange the panels?','What logic do you follow when the arrangement differs from the conventional shape?','Where do you position sleeve cuffs, yoke panels, pockets, lapels, loops, etc.?']},
+    {h:'Evaluation of arrangement',qs:['Do we have a method to confirm whether the arrangement is working?','How do we verify whether any panels are missing?','How do we verify the arrangement is the correct one?']},
+  ]},
+  s2:{title:'Think-aloud · Stage 2',groups:[
+    {h:'',qs:['What is the task given to you?','What imagery did you get when you got this task?','Describe the type of panels you see in front of you.','What imagery did you get when you were given these panels?','How are you planning to construct the garment?','Which panel are you going to start the construction with?','What materials do you need to construct, and why those materials?']},
+  ]},
+  s3:{title:'Think-aloud · Stage 3',groups:[
+    {h:'',qs:['What is the task given to you?','What imagery did you get when you got this task?','Can you visualise how the drawn line would appear on the garment?','Can you visualise cutting along the drawn line to create a separated garment form?','What is your strategy to find the shape of the 2D panel from the 3D form?','How are you planning to flatten out the 3D form?','Where will you cut to spread the 3D form?','What is your thinking process while cutting the 3D form to a flat panel?','How do you decide whether the 2D panel needs further change?','What is your idea of creating a good working 2D panel by spreading the 3D form?','How are you planning to trace the shape as a flat 2D panel?','How will you attach the flat 2D panel back to the 3D garment where it was removed?','Where will you start attaching?','What complexities do you face while attaching the 2D panel to the garment?','How will you tackle these complexities?']},
+  ]},
+};
+const INTERVIEWDEF = {
+  s1:{title:'Interview · Stage 1',groups:[
+    {h:'Overall process',qs:['Describe the process you followed to complete the workshop.','Did you make any guesses due to lack of information — what were they?']},
+    {h:'Garment assignment',qs:['Did the system assigning the garment help participants, or not?']},
+    {h:'Panel selection & creation',qs:['Were the available panels comprehensive enough to modify and create panels for your task?','Was it easy to modify and create new panels?','Was it challenging to identify the shape of the panels — which were easy and which more challenging?']},
+    {h:'Panel arrangement',qs:['Once shapes were identified, how did you decide each position in the arrangement?','What challenges did you face in the arrangement of panels?']},
+    {h:'Self-evaluation',qs:['How did you verify whether your arrangement is correct?','How did you verify you had no other panels left to create?','How did you ensure the arrangement also eases construction?']},
+  ]},
+  s2:{title:'Interview · Stage 2',groups:[
+    {h:'',qs:['Can you explain what you understood when the task was given to you?','What challenges did you face when thinking about completing the task?','How did you verify whether the given panels were all suitable?','Did you face difficulties with the panels given?','Explain your process of construction.','What did you imagine doing when the panels were given to you?','What imagery did you get when you were given these panels?','Did you notice changes between how you visualised earlier and later? Explain.','Was what you made at the end the same as what you first imagined? If different, how — and what created the change?','When you were confused, how did you resolve it — what was your strategy?']},
+  ]},
+  s3:{title:'Interview · Stage 3',groups:[
+    {h:'',qs:['Can you explain what you understood when the task was given to you?','What is the significance of this task in fashion design?','What challenges did you face to understand the task?','What is the first challenge given in this task?','How did you manage to complete the task?','What was your learning?','What was the second task, after cutting the 3D garment?','What challenges did you face while doing it?','What did you learn by doing this task?','What was the third task, after flattening the garment?','What challenges did you face while doing it?','What is your learning?','What was the last task given to you?','What were the challenges?','What is your learning while doing the task?','What is the benefit of this workshop for a fashion designer?']},
+  ]},
+};
+// ── Final Reflection — a single workshop-level instrument shown once, after
+// every assigned stage is complete (not tied to any one stage — see
+// PKG.finalReflection / renderFinalReflectionScreen below). Gated by
+// PKG.share.finalReflection, same convention as .survey/.prompt/.interview. ──
+const FINAL_REFLECTION_DEF = {
+  title:'Final Reflection',
+  // Same {narrative, steps, reminder} shape as a Brief page's intro (see
+  // STAGE_BRIEF/briefIntroHTML/briefStepsHTML/briefReminderHTML) — the
+  // intro screen this drives is deliberately built from the same pieces so
+  // it reads as the same design as Welcome and every stage Brief.
+  intro:{
+    narrative:'You\'ve completed every activity in this workshop — thank you.',
+    steps:[
+      'Answer a short set of questions about your overall experience with the workshop.',
+      'Share your honest thoughts — there are no right or wrong answers here.',
+      'Once you finish, you\'ll be able to export your completed workshop package.',
+    ],
+    reminder:'Thank you for taking part in this study — your reflections help the research understand how design students think through these tasks.',
+  },
+  // Framed around the participant's own experience/perceived benefit rather
+  // than research terminology like "2D↔3D transformation" — per explicit
+  // instruction (Survey Revision, item 7).
+  qs:[
+    {t:'single',q:'Which workshop activity helped you the most?',opts:['Pre-test','Stage 1','Stage 2','Stage 3','Post-test']},
+    {t:'open',q:'Why was this activity most helpful?'},
+    {t:'likert',q:'After completing the workshop, do you feel that your approach to working with garment panels and garments has changed?',ends:[L5_CHANGE[0],L5_CHANGE[4]],labels:L5_CHANGE},
+    // Ranking, not single-choice — per explicit instruction.
+    {t:'rank',q:'Please rank the areas you would most like to improve, from highest priority to lowest priority.',opts:['Identifying panels','Creating/developing panels','Arranging panels','Constructing garments','Developing style-line panels']},
+    {t:'multi',q:'Which challenges would you most like additional support with?',opts:['Understanding garment shape','Visualising 3D form','Developing/flattening panels','Arranging or constructing panels','Understanding style lines','Other']},
+    {t:'likert',q:'To what extent do you feel this workshop improved your confidence in working with garment panels and garments?',ends:[L5_CHANGE[0],L5_CHANGE[4]],labels:L5_CHANGE},
+  ]
+};
+const STAGE_ORDER=['pretest','s1','s2','s3','posttest'];
+const STAGE_NAME={pretest:'Pre-test',s1:'Stage 1 · Identify and arrange the panels',s2:'Stage 2 · Construct the garment',s3:'Stage 3 · Style-line panel',posttest:'Post-test'};
+// ── Training Task (interface familiarisation only) ──────────────────────
+// Deliberately generic shapes, not garment panels — the point is to teach
+// "how do I use Panel Studio's tools", never "how should I approach the
+// garment-panel problem" (no patternmaking examples, hints or scaffolds
+// belong here). Fed straight into Panel Studio's ordinary tray-panel slot
+// ({image,shape,label}), so tray-insert/Pen-trace/select-move/delete/zoom
+// all reuse Panel Studio's existing behaviour unchanged.
+const TRAINING_SHAPES=[
+  {image:'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="#ffffff" stroke="#1a1a1a" stroke-width="3"/></svg>'), shape:null, label:'Circle'},
+  {image:'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><polygon points="60,10 110,105 10,105" fill="#ffffff" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round"/></svg>'), shape:null, label:'Triangle'},
+  {image:'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect x="12" y="12" width="96" height="96" fill="#ffffff" stroke="#1a1a1a" stroke-width="3"/></svg>'), shape:null, label:'Square'},
+];
+// ── Brief page content (task-oriented redesign — replaces the earlier
+// Objective/Your Task/Remember layout). Every stage follows the same
+// {intro, steps} structure: intro is a short (1-2 sentence) participant-
+// friendly narrative for why the activity exists, steps is exactly 3
+// numbered, action-oriented instructions for what to do — plus the shared
+// REMEMBER_NOTE shown identically on every stage as a small panel at the
+// bottom (see renderStageBrief()). Wording deliberately avoids implying a
+// single correct answer (no "the corresponding panel(s)", "correctly
+// arrange", etc.) and never teaches solution strategy — steps say what to
+// do, not how to solve it. Pre-test and Post-test share identical steps on
+// purpose, since the point of Post-test is a direct, comparable repeat of
+// Pre-test. ──
+const REMEMBER_NOTE = 'Your thinking matters as much as your answer. Work your own way—there may be more than one valid approach.';
+const STAGE_BRIEF={
+  pretest:{
+    intro:'This is a warm-up activity before the workshop begins — there’s nothing to prepare in advance.',
+    steps:[
+      'Study the garment image you’ve been given.',
+      'Design and shape the 2D panels you believe would construct it, using the basic panel shapes as your starting point.',
+      'Arrange your finished panels in the workspace.',
+    ],
+  },
+  s1:{
+    intro:'This activity looks at how you break a garment down into its panels and arrange them for construction.',
+    steps:[
+      'Study the garment you’ve been assigned.',
+      'Identify and create the panels you believe are needed to construct it.',
+      'Arrange the panels in the workspace in a construction-ready layout.',
+    ],
+  },
+  s2:{
+    intro:'This activity looks at how you move from a flat panel layout to an actual garment.',
+    steps:[
+      'Study the panel arrangement and garment image provided.',
+      'Construct only the top garment from these panels — physically or digitally in Clo3D.',
+      'Build it in whichever way you think best achieves the garment shown.',
+    ],
+  },
+  s3:{
+    intro:'This activity looks at how you work out a 2D panel shape from a 3D design detail.',
+    steps:[
+      'Study the garment with the style line marked on it.',
+      'Develop the 2D panels you believe would construct that part of the garment.',
+      'Consolidate your work into a single finished panel shape.',
+    ],
+  },
+  posttest:{
+    intro:'This is a closing activity, repeating the Pre-test so any change in your approach can be seen — there’s no need to match your earlier answer.',
+    steps:[
+      'Study the garment image you’ve been given.',
+      'Design and shape the 2D panels you believe would construct it, using the basic panel shapes as your starting point.',
+      'Arrange your finished panels in the workspace.',
+    ],
+  },
+};
+const STAGE_VERB={
+  pretest:'Start the design task', s1:'Start arranging the panels',
+  s2:'Start constructing', s3:'Start developing the panel',
+  posttest:'Start the design task',
+};
+// Presentation-only placeholders (clarification #1) — not schema fields, not derived from PKG.
+const STAGE_TIME_BUDGET={pretest:'10 min',s1:'15 min',s2:'25 min',s3:'15 min',posttest:'10 min'};
+
+// ════════════════════════════════════════
+//  PROGRESSIVE REFERENCE (HINT) SYSTEM
+// ════════════════════════════════════════
+// Purpose (per explicit research design, not a teaching/guidance tool):
+// (1) rescue support for a genuinely stuck participant, (2) measuring
+// dependence on progressively stronger visual references. References never
+// appear automatically and are never time-gated — only the participant's
+// own reveal actions advance the sequence.
+//
+// Each stage has one Primary Task Reference (always available, unlocked,
+// not logged — it isn't a "hint") and an ordered Additional References
+// list. Each additional reference unlocks only after the previous one has
+// been revealed at least once; already-revealed ones stay available for
+// the rest of the activity. `field` names an image key already present on
+// the task payload's `garment` object built in loadTaskIntoPanelStudio()
+// below (image/frontBackImage/flatSketchImage/groupPanelImage/
+// scaffold4Image — all pre-existing asset-role fields, nothing new).
+// `type:'panels'` is the one non-image reference — revealing it doesn't
+// change the on-canvas overlay at all, it permanently unlocks the
+// individual-panel tray (see individualPanelTray on the stage object,
+// built by Console) in place of the basic-panel tray every stage starts
+// with. Per explicit instruction, the tray itself is a workspace tool, not
+// a hint — only the *unlock moment* is logged, not ongoing tray use.
+const STAGE_REFERENCES = {
+  pretest: {
+    primary: {key:'full', label:'Full Garment Image', field:'image'},
+    additional: [
+      {key:'frontBack', label:'Front & Back Garment View', field:'frontBackImage'},
+      {key:'flat', label:'Flat Sketch', field:'flatSketchImage'},
+    ]
+  },
+  s1: {
+    primary: {key:'full', label:'Full Garment Image', field:'image'},
+    additional: [
+      {key:'frontBack', label:'Front & Back Garment View', field:'frontBackImage'},
+      {key:'flat', label:'Flat Sketch', field:'flatSketchImage'},
+      {key:'halfArrangement', label:'Half Panel Arrangement', field:'groupPanelImage'},
+      {key:'individualPanels', label:'Reveal Individual Panels', type:'panels'},
+    ]
+  },
+  s2: {
+    primary: {key:'fullArrangement', label:'Full Panel Arrangement', field:'scaffold4Image'},
+    additional: [
+      {key:'individualPanels', label:'Reveal Individual Panels', type:'panels'},
+      {key:'flat', label:'Flat Sketch', field:'flatSketchImage'},
+      {key:'frontBack', label:'Front & Back Garment View', field:'frontBackImage'},
+      {key:'full', label:'Full Garment Image', field:'image'},
+    ]
+  },
+  s3: {
+    primary: {key:'markedFull', label:'Marked Full Garment Image', field:'image'},
+    additional: [
+      {key:'markedFrontBack', label:'Marked Front & Back Garment View', field:'frontBackImage'},
+      {key:'markedFlat', label:'Marked Flat Sketch', field:'flatSketchImage'},
+      {key:'halfArrangement', label:'Half Panel Arrangement', field:'groupPanelImage'},
+      {key:'fullArrangement', label:'Full Panel Arrangement', field:'scaffold4Image'},
+      {key:'individualPanels', label:'Reveal Individual Panels', type:'panels'},
+    ]
+  },
+};
+STAGE_REFERENCES.posttest = STAGE_REFERENCES.pretest; // same closing-test task type as pretest
+
+// Unlock progression is deliberately NOT a stored field — it's derived from
+// lifecycleLog, the same way computeStageMetrics() (Console) already
+// derives activity duration from activity_entered/exited pairs. Revealing
+// additional-reference N requires 1..N-1 already revealed (the UI never
+// allows skipping — see Panel Studio's renderScaffoldIcons), so "how many
+// distinct refs have a reference_shown event, counted from the start of
+// the list" IS the current unlock level; no separate persisted counter can
+// drift out of sync with the real event history. Stops at the first
+// not-yet-revealed one so a structurally impossible out-of-order event
+// (there shouldn't be one) can't inflate the count.
+function unlockedReferenceCount(stageKey){
+  const refs = STAGE_REFERENCES[stageKey];
+  if(!refs) return 0;
+  const log = (PKG && PKG.lifecycleLog) || [];
+  const shown = new Set(log.filter(e=>e && e.stage===stageKey && e.type==='reference_shown' && e.ref).map(e=>e.ref));
+  let count=0;
+  for(const r of refs.additional){ if(shown.has(r.key)) count++; else break; }
+  return count;
+}
+// Automatic Reveal — once Studio work for a stage is finished, the
+// "never skip ahead" rule above no longer serves any purpose (there's
+// nothing left to bias), so the Full Panel Arrangement hint — if this stage
+// has one — becomes available immediately, without the participant having
+// to click through every hint before it. Implemented as a genuine
+// "catch-up" reveal (logging reference_shown for anything still unrevealed
+// up to and including it) rather than a special case elsewhere, so every
+// other derivation (unlockedReferenceCount, hint-usage metrics) keeps
+// working unchanged. A no-op for stages with no such hint (pretest/
+// posttest/s1 today) and for Stage 2, whose Full Panel Arrangement is the
+// primary task reference shown from the very start, not a hint to reveal.
+function autoRevealFullArrangement(stageKey){
+  if(stageKey==='s2') return;
+  const refs = STAGE_REFERENCES[stageKey];
+  if(!refs) return;
+  const idx = refs.additional.findIndex(r=>r.key==='fullArrangement');
+  if(idx===-1) return;
+  const already = unlockedReferenceCount(stageKey);
+  for(let i=already; i<=idx; i++){ logLifecycle('reference_shown', stageKey, refs.additional[i].key); }
+}
+
+// ════════════════════════════════════════
+//  DEFERRED UX ITEMS — noted, not implemented. Revisit once the
+//  participant experience itself is finalized:
+//   • Save / Save & pause buttons — currently hidden (SHOW_SAVE_BUTTONS
+//     below), pending confirmation that autosave-by-default is sufficient;
+//     may be permanently removed rather than restored.
+// ════════════════════════════════════════
+// (The legacy PDF-based "Researcher's Solution" item that used to be noted
+// here — solutionCompareHTML(), g.solutionFile/solutionFileName — was
+// removed entirely by explicit request, not merely deferred. The generic
+// solutionImagePng "Researcher's solution" card is the one live replacement.)
+const SHOW_SAVE_BUTTONS = false; // toggle to bring the rail's Save buttons back
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+let PKG = null;          // the imported/loaded participant package
+let VIEW_STAGE = null;   // which stage is currently open in the UI
+let WELCOME_SEEN = false; // transient — shows renderWelcomeScreen() once per page load, never persisted
+let currentPkgFileHandle = null, currentPkgFileName = null;
+let psLoadedForStage = null;  // which stage's task is currently loaded into the native Panel Studio module
+let currentSessionId = null;
+// Training Task (interface familiarisation only) — transient/in-memory
+// only, same treatment as WELCOME_SEEN: never written to PKG, so a reload
+// always drops back to the overview rather than resuming mid-training.
+// Only PKG.training (completion status) persists — see finishTrainingTask().
+let TRAINING_VIEW = null;    // null | 'brief' | 'studio'
+let trainingLoaded = false;  // mirrors psLoadedForStage's role, scoped to the training workspace
+
+function newId(prefix){
+  if(window.crypto && typeof crypto.randomUUID === 'function') return prefix+'_'+crypto.randomUUID();
+  return prefix+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+}
+function startSession(){
+  if(!PKG) return;
+  if(!PKG.sessions) PKG.sessions = [];
+  PKG.sessions.forEach(s=>{ if(!s.endedAt){ s.endedAt = new Date().toISOString(); s.endedReason = 'replaced'; } });
+  const id = newId('sess');
+  PKG.sessions.push({id, startedAt:new Date().toISOString(), endedAt:null, endedReason:null});
+  currentSessionId = id;
+}
+function endCurrentSession(reason){
+  if(!PKG || !currentSessionId) return;
+  const s = PKG.sessions.find(s=>s.id===currentSessionId);
+  if(s && !s.endedAt){ s.endedAt = new Date().toISOString(); s.endedReason = reason; }
+}
+
+// ── Native integration with Panel Studio (panel-studio-module.js) — no
+// iframe, no postMessage. PanelStudio.mount() is called once and its DOM/JS
+// state then lives for the rest of the page's life, so leaving the Activity
+// screen and coming back doesn't lose work-in-progress, same as before. ──
+PanelStudio.onComplete(async function(project, stageKey){
+  // Training Task uses this exact same "Finish" button/modal/callback
+  // plumbing (see panel-studio-module.js's showCompleteModal() isTraining
+  // branch), but must never fall through into the research-stage logic
+  // below — finishTrainingTask() is a fully separate, non-stage path.
+  if(stageKey==='training'){ finishTrainingTask(); return; }
+  if(!stageKey || !PKG || !PKG.stages[stageKey]) return;
+  const st = PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  // Marks the studio work itself done via a dedicated timestamp rather than
+  // recording a redundant panel-studio-work-*.json "upload" — the whole
+  // package (already saved throughout, and exported again at the very end)
+  // is the single authoritative record of this project's state, so a
+  // second copy of the same data as a fake "attached file" added nothing.
+  // studioIsComplete() below still also honours a genuine manual upload
+  // (Stage 2's physical-construction photos etc.), unaffected by this.
+  st.studioCompletedAt = new Date().toISOString();
+  autoRevealFullArrangement(stageKey);
+  PanelStudio.setReferenceUnlockState(unlockedReferenceCount(stageKey));
+  // Confirming Finish inside the Studio (timer already stopped by
+  // _confirmComplete()) closes it immediately and returns to Brief — Brief's
+  // own workflow stepper picks this up automatically via stagePhase(), since
+  // studioIsComplete() just became true. No manual "Done — continue" step,
+  // and no auto-jump into Survey either — Brief is the hub the participant
+  // chooses "Start Survey" from.
+  logLifecycle('activity_exited', stageKey);
+  PKG.progress.currentScreen = 'brief';
+  toast('Your Panel Studio work for '+STAGE_NAME[stageKey]+' was recorded');
+  render();
+  // Deliberately no saveProgress() here — this callback runs outside a real
+  // user gesture (Finish's confirm click already resolved), so
+  // showSaveFilePicker() always throws and saveProgress() silently falls
+  // back to forcing a real browser file download on the participant. The
+  // work above is already recorded into PKG in memory (same as every other
+  // in-app action — survey answers, uploads); it persists to a file the
+  // next time the participant hits an explicit Save button.
+});
+// "Back to Activity" clicked inside a read-only (already-completed) Studio
+// view — same destination Studio always returns to on completion (Brief is
+// the hub; see the comment above).
+PanelStudio.onBack(function(){
+  PKG.progress.currentScreen = 'brief';
+  render();
+});
+// Progressive Reference system — fires whenever the participant reveals,
+// switches to, or hides a reference tab inside Panel Studio's task-brief
+// panel. Participant owns all logging (invariant: Panel Studio never
+// touches PKG); Panel Studio only reports the raw interaction. action is
+// 'shown' or 'hidden' — a tab switch fires hidden(old) then shown(new), so
+// per-reference viewing intervals and counts are always derivable from
+// consecutive pairs, the same shape as activity_entered/exited.
+// setReferenceUnlockState() is called right back with the freshly-derived
+// count so Panel Studio's own tab rendering (and, for the 'panels'-type
+// reference, its tray content) updates immediately on the same click that
+// caused it — no separate re-sync round trip.
+PanelStudio.onReferenceEvent(function(action, refKey, stageKey){
+  if(!PKG || !stageKey || !refKey) return;
+  logLifecycle(action==='shown' ? 'reference_shown' : 'reference_hidden', stageKey, refKey);
+  if(action==='shown') PanelStudio.setReferenceUnlockState(unlockedReferenceCount(stageKey));
+});
+
+function openInPanelStudio(stageKey){
+  const st = PKG.stages[stageKey];
+  if(!st || !st.assigned){ alert('This stage has not been assigned by your researcher yet.'); return; }
+  // Guarded against a double-click race before render() swaps the Brief/
+  // Reflect screen out — every real call here is a genuine transition,
+  // since those screens never render while currentScreen is already
+  // 'activity'. Not deduplicated like stage_entered: reopening a
+  // completed stage's Activity screen later is a real, distinct visit.
+  if(PKG.progress.currentScreen !== 'activity') logLifecycle('activity_entered', stageKey);
+  PKG.progress.currentScreen = 'activity';
+  render();
+}
+function loadTaskIntoPanelStudio(stageKey){
+  const st = PKG.stages[stageKey];
+  if(!st || !st.assigned) return;
+  PanelStudio.mount(document.getElementById('ps-native-root'));
+  // Applied on every visit, not just the first load — cheap/idempotent, and
+  // must stay in sync even when the early-return below skips reloading the
+  // task file (e.g. re-rendering while already viewing this same stage).
+  const done = studioIsComplete(stageKey);
+  PanelStudio.setReadOnly(done, done ? {completedLabel:'Completed in '+fmtStudioDuration(stageKey)} : undefined);
+  // Same "must stay in sync on every visit" reasoning as setReadOnly above —
+  // resuming a saved-and-reopened package (or just switching screens and
+  // back) must always reflect whatever was actually revealed, derived fresh
+  // from lifecycleLog rather than trusted from any in-memory state.
+  PanelStudio.setReferenceUnlockState(unlockedReferenceCount(stageKey));
+  if(psLoadedForStage === stageKey) return; // already loaded — just switched screens, no reload needed
+  const g = st.garment || {};
+  const task = {
+    flatform_task: true, stage: stageKey,
+    garment: { name:g.name, type:g.type, image:g.fullImg||'', frontBackImage:g.frontBackImg||'', flatSketchImage:g.flatSketchImg||'', groupPanelImage:g.arrangementScaffold||'', scaffold4Image:g.fullArrangementPng||'' },
+    complexity: {s:'Simple',m:'Moderate',c:'Complex'}[st.cx]||st.cx,
+    styleLine: st.styleLine || null,
+    panels: (st.tray||[]).map(item=>({ image:item.img||null, shape:item.shape||null, label:item.label })),
+    // Progressive Reference system: the alternate individual-panel tray
+    // (only meaningful for s1/s2/s3 — Console leaves it undefined for
+    // pretest/posttest, which never swap trays) and the ordered reference
+    // config Panel Studio needs to render locked/unlocked tabs correctly.
+    individualPanelTray: (st.individualPanelTray||[]).map(item=>({ image:item.img||null, shape:item.shape||null, label:item.label })),
+    references: STAGE_REFERENCES[stageKey] || null,
+    brief: (STAGE_BRIEF[stageKey] && STAGE_BRIEF[stageKey].steps.join(' ')) || '',
+    budgetMin: parseInt(STAGE_TIME_BUDGET[stageKey], 10) || null,
+    participantCode: (PKG.participant && PKG.participant.code) || '',
+    exportId: getExportId(),
+    // Stage 2's Full Panel Arrangement PDF is task input, not a post-task
+    // solution — re-exposed here so the participant can re-download it from
+    // inside the Stage 2 activity screen without leaving it (see
+    // renderPlanPanel()'s stage==='s2' branch in panel-studio-module.js).
+    // Harmless no-op for every other stage (renderPlanPanel only reads it
+    // when t.stage==='s2').
+    fullArrangementPdf: g.fullArrangementPdf || null,
+    fullArrangementPdfName: g.fullArrangementPdfName || '',
+  };
+  psLoadedForStage = stageKey;
+  PanelStudio.applyTaskFile(task);
+  PanelStudio.setReferenceUnlockState(unlockedReferenceCount(stageKey));
+  const draft = st.activityDraft;
+  if(draft){ PanelStudio.restoreState(draft); logSync('restore_applied', stageKey); }
+}
+
+function logSync(type, stageKey){
+  if(!PKG) return;
+  if(!PKG.syncLog) PKG.syncLog=[];
+  PKG.syncLog.push({t:new Date().toISOString(), stage:stageKey||null, screen:'activity', type});
+}
+function snapshotActivity(stageKey){
+  if(psLoadedForStage !== stageKey) return Promise.resolve(false);
+  PKG.stages[stageKey].activityDraft = PanelStudio.buildStateSnapshot();
+  logSync('snapshot_applied', stageKey);
+  return Promise.resolve(true);
+}
+async function saveFromActivity(){
+  if(VIEW_STAGE) await snapshotActivity(VIEW_STAGE);
+  await saveProgress();
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden' && PKG && PKG.progress.currentScreen==='activity' && VIEW_STAGE){
+    snapshotActivity(VIEW_STAGE); // best-effort — page may be backgrounded/closed before this resolves
+  }
+});
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(()=>t.classList.remove('show'),2600); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function readFileAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error||new Error('File could not be read')); r.readAsDataURL(file); }); }
+// Builds the returned-package filename from the participant's own name —
+// "<Name>_<YYYYMMDD>_<HHMM>_FlatFormSolution.json" — computed once (at
+// import for an Assigned package, at registration for a Shared one, since
+// the name isn't known until then) and reused by every later saveProgress()
+// call, so the participant always has exactly one evolving file, clearly
+// distinguishable from the blank package the researcher originally sent.
+function toReturnedFileName(participantName){
+  const now = new Date();
+  const date = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+  const time = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+  const safeName = (participantName||'').trim().replace(/\s+/g,'').replace(/[^a-zA-Z0-9_-]/g,'') || 'Participant';
+  return `${safeName}_${date}_${time}_FlatFormSolution.json`;
+}
+// The short export id baked into Console's export filename (see
+// buildPackageFileName() in flat-form-console_11_1_11.html) — read back out
+// of currentPkgFileName so Panel Studio's PDF/PNG exports and this package's
+// own filename all carry the same id without adding a new PKG field. Cached
+// per session; falls back to a freshly-generated id if the file was renamed
+// beyond recognition (e.g. a pre-convention legacy package).
+let _sessionExportId = null;
+function getExportId(){
+  if(_sessionExportId) return _sessionExportId;
+  const m = currentPkgFileName && currentPkgFileName.match(/ - ([A-Z0-9]{4,8})(?: - Solution)?\.json$/i);
+  _sessionExportId = m ? m[1].toUpperCase() : ('EXP'+Date.now().toString(36).slice(-4).toUpperCase());
+  return _sessionExportId;
+}
+// Per-stage counterpart of computeTotalStudioTime() (which sums across all
+// stages) — same activity_entered/activity_exited pairing, scoped to one
+// stage. Deliberately a separate function rather than a refactor of the
+// already-verified total, per this project's standing preference for small
+// duplication over touching frozen, working code.
+function computeStageActivityDuration(stageKey){
+  const log = (PKG && PKG.lifecycleLog) || [];
+  const events = log.filter(e=>e && e.stage===stageKey && (e.type==='activity_entered'||e.type==='activity_exited') && e.t)
+    .slice().sort((a,b)=>new Date(a.t)-new Date(b.t));
+  let totalMs=0, enteredAt=null;
+  events.forEach(e=>{
+    if(e.type==='activity_entered'){ enteredAt=e.t; }
+    else if(enteredAt){ const ms=new Date(e.t)-new Date(enteredAt); if(Number.isFinite(ms)&&ms>=0) totalMs+=ms; enteredAt=null; }
+  });
+  return totalMs;
+}
+function fmtStudioDuration(stageKey){
+  const totalSec = Math.round(computeStageActivityDuration(stageKey)/1000);
+  const m = Math.floor(totalSec/60), s = totalSec%60;
+  return m>0 ? `${m} min ${s} sec` : `${s} sec`;
+}
+
+// ════════════════════════════════════════
+//  IMPORT / OPEN a package (or a checkpoint — same format)
+// ════════════════════════════════════════
+function emptyResponse(){
+  return {survey:null,promptNotes:'',interviewNotes:'',uploads:[],submittedAt:null};
+}
+function migratePackage(pkg){
+  if(!pkg.progress) pkg.progress = {currentStage:'pretest', completedStages:[]};
+  if(!pkg.schemaVersion) pkg.schemaVersion = 1;
+  if(pkg.schemaVersion < 2){
+    if(!pkg.sessions) pkg.sessions = [];
+    if(!pkg.eventLog) pkg.eventLog = [];
+    if(!pkg.syncLog) pkg.syncLog = [];
+    if(!pkg.consent) pkg.consent = {recording:'no', interactionLogging:false};
+    if(!pkg.progress.currentScreen) pkg.progress.currentScreen = 'brief';
+    Object.keys(pkg.stages||{}).forEach(function(k){
+      const st = pkg.stages[k];
+      if(!st.activityDraft) st.activityDraft = null;
+      if(st.response && st.response.submittedAt === undefined) st.response.submittedAt = null;
+    });
+    pkg.schemaVersion = 2;
+  }
+  if(pkg.schemaVersion < 3){
+    if(!pkg.lifecycleLog) pkg.lifecycleLog = [];
+    pkg.schemaVersion = 3;
+  }
+  if(pkg.schemaVersion < 4){
+    if(!pkg.progress.hasOwnProperty('packageConfirmed')){
+      pkg.progress.packageConfirmed = (pkg.sessions||[]).length > 0;
+    }
+    pkg.schemaVersion = 4;
+  }
+  if(pkg.schemaVersion < 5){
+    // Pre-study survey (Survey Revision, item 1) — additive only, same
+    // shape as the existing finalReflection field. Left null rather than
+    // pre-built with empty answers so surveyAnswersFor('prestudy') builds
+    // it fresh (with however many questions PRESTUDY_DEF currently has)
+    // the first time it's actually touched.
+    if(!pkg.hasOwnProperty('preStudy')) pkg.preStudy = null;
+    pkg.schemaVersion = 5;
+  }
+  if(pkg.schemaVersion < 6){
+    // Training Task (interface familiarisation only) — additive-only, same
+    // lazy-null-until-touched shape as preStudy/finalReflection above.
+    // Deliberately NOT part of pkg.stages: it must never be mistaken for a
+    // research stage by anything that iterates STAGE_ORDER/pkg.stages.
+    if(!pkg.hasOwnProperty('training')) pkg.training = null;
+    pkg.schemaVersion = 6;
+  }
+  return pkg;
+}
+// ── The canonical participant workflow timeline — significant lifecycle
+// transitions (stage_entered, activity_entered/activity_exited,
+// progress_saved), not a place to store derived timing numbers. Metrics
+// (durations, etc.) are computed FROM this timeline by readers, never
+// stored here. Mirrors logSync()'s shape exactly ({t, stage, type}) but is
+// a separate array — syncLog stays specifically about sync-protocol
+// health, this is specifically about participant workflow lifecycle.
+// progress_saved is logged with stage:null since a save persists the whole
+// package, not one stage — see saveProgress() for its two emission points. ──
+// refKey is optional and only ever set by the Progressive Reference system
+// below (reference_shown/reference_hidden) — every other existing call site
+// passes just (type, stageKey) unchanged, so this stays fully backward
+// compatible; an entry with no ref is simply omitted, not stored as null,
+// so old-shaped lifecycleLog entries and these new ones are structurally
+// identical except for the one genuinely new field.
+function logLifecycle(type, stageKey, refKey){
+  if(!PKG) return;
+  if(!PKG.lifecycleLog) PKG.lifecycleLog = [];
+  const entry = {t:new Date().toISOString(), stage:stageKey||null, type};
+  if(refKey) entry.ref = refKey;
+  PKG.lifecycleLog.push(entry);
+}
+// Package-driven navigation: which stage should the participant work on next,
+// based purely on what the researcher assigned and what's already completed —
+// never on a fixed position in STAGE_ORDER. Callers never need to know how
+// this is determined, only that it reflects the package's own contents.
+function getNextAssignedStage(pkg, extraCompleted){
+  const done = (pkg.progress.completedStages||[]).concat(extraCompleted||[]);
+  return STAGE_ORDER.find(sk => pkg.stages[sk] && pkg.stages[sk].assigned && !done.includes(sk));
+}
+function hasAnyAssignedStage(pkg){
+  return STAGE_ORDER.some(sk => pkg.stages[sk] && pkg.stages[sk].assigned);
+}
+function openPackageFile(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  if(PKG && !confirm('Opening a new file will replace everything currently loaded that hasn\'t been saved. Continue?')){
+    input.value='';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(){
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(e){ alert('This does not look like a valid task package file.'); input.value=''; return; }
+    if(!data || !data.flatform_participant_package || !data.stages){
+      alert('This does not look like a Flat⇄Form task package (exported from the Workshop Console\'s Package & Send page).');
+      input.value=''; return;
+    }
+    PKG = migratePackage(data);
+    // Captured before startSession() runs below — sessions.length===0 is a
+    // structural fact (nothing in this app ever clears an existing sessions
+    // array; see logLifecycle's header comment), not an inference from which
+    // resolution branch fires. Used only to log a genuine first-ever
+    // stage_entered further down — never to skip/alter the resolution logic
+    // itself, which is unchanged from before.
+    const isFirstEverSession = !PKG.sessions || PKG.sessions.length === 0;
+    const cur = PKG.progress.currentStage, curStage = PKG.stages[cur];
+    const curStillValid = curStage && curStage.assigned && !(PKG.progress.completedStages||[]).includes(cur);
+    if(!curStillValid){
+      const next = getNextAssignedStage(PKG);
+      if(next){ PKG.progress.currentStage = next; PKG.progress.currentScreen = 'brief'; }
+      // if next is undefined: either nothing is assigned yet, or everything
+      // assigned is already complete — leave currentStage untouched either
+      // way; render() handles the "nothing assigned" case, and the
+      // "everything complete" case is already just that stage's own
+      // recorded Reflect screen.
+    }
+    if(isFirstEverSession && PKG.stages[PKG.progress.currentStage] && PKG.stages[PKG.progress.currentStage].assigned){
+      logLifecycle('stage_entered', PKG.progress.currentStage);
+    }
+    VIEW_STAGE = PKG.progress.currentStage;
+    // A Shared Workshop Package (see flat-form-console_11_1_11.html's
+    // buildSharedWorkshopPackage()) has no participant identity yet — the
+    // filename can't be finalised until renderParticipantRegistration()'s
+    // submitParticipantRegistration() sets PKG.participant and calls
+    // toReturnedFileName() itself. An Assigned package already has a name.
+    currentPkgFileName = PKG.participant ? toReturnedFileName(PKG.participant.name) : null;
+    currentPkgFileHandle = null;
+    startSession();
+    render();
+    toast(PKG.participant
+      ? ('Welcome, '+PKG.participant.name+' — Save will update "'+currentPkgFileName+'"')
+      : 'Package imported — please tell us who you are to continue');
+    input.value='';
+  };
+  reader.onerror = function(){ alert('Could not read that file.'); input.value=''; };
+  reader.readAsText(f);
+}
+
+// Returns true/false once a genuine save attempt has resolved (existing
+// callers that don't check the return value are unaffected) — added so
+// exportFinalPackage() can tell a real completed write apart from a
+// cancelled dialog or a read failure before it locks the application.
+async function saveProgress(){
+  if(!PKG) return false;
+  let json;
+  try{ json = JSON.stringify(PKG, null, 2); }
+  catch(e){ alert('Could not save: '+e.message); return false; }
+
+  if(window.showSaveFilePicker){
+    try{
+      if(!currentPkgFileHandle){
+        currentPkgFileHandle = await window.showSaveFilePicker({
+          suggestedName: currentPkgFileName || ('participant-'+(PKG.participant?PKG.participant.code:'progress')+'.json'),
+          types: [{ description:'Flat⇄Form task package', accept:{'application/json':['.json']} }]
+        });
+      }
+      const w = await currentPkgFileHandle.createWritable();
+      await w.write(json); await w.close();
+      currentPkgFileName = currentPkgFileHandle.name;
+      // File System Access API: write()+close() resolving means the browser
+      // has confirmed the write completed — the strongest signal this path offers.
+      logLifecycle('progress_saved', null);
+      toast('Saved to "'+currentPkgFileName+'" — share this file with your researcher');
+      return true;
+    }catch(err){
+      if(err && err.name==='AbortError') return false;
+      console.error(err);
+    }
+  }
+  const name = currentPkgFileName || ('participant-'+(PKG.participant?PKG.participant.code:'progress')+'.json');
+  currentPkgFileName = name;
+  const blob = new Blob([json], {type:'application/json'});
+  try{
+    // Must stay awaited: callers (e.g. savePause()) tell the participant it's
+    // safe to close the tab right after `await saveProgress()` returns — that
+    // can't be true until the download has actually been triggered below.
+    const dataUrl = await new Promise((res,rej)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>res(reader.result);
+      reader.onerror = ()=>rej(reader.error||new Error('File could not be read'));
+      reader.readAsDataURL(blob);
+    });
+    const a=document.createElement('a'); a.href=dataUrl; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    // Download fallback: a.click() firing is the strongest completion signal
+    // browsers expose here — there's no event for "the file finished writing
+    // to disk," only for "the download was successfully initiated."
+    logLifecycle('progress_saved', null);
+    toast('Saved as "'+name+'" — share this file with your researcher');
+    return true;
+  }catch(err){
+    alert('Could not save (file read failed).');
+    return false;
+  }
+}
+async function savePause(){
+  endCurrentSession('pause');
+  await saveProgress();
+  toast('Saved — you can safely close this tab and continue later');
+}
+
+// ════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════
+function render(){
+  const root = document.getElementById('root');
+  const psContainer = document.getElementById('ps-container');
+  // Hard top-level gate — checked before even the Activity-screen branch
+  // below, so a finalized package can never be reopened for editing under
+  // any prior state (including a stale currentScreen==='activity').
+  if(PKG && PKG.progress.workshopFinalized){
+    psContainer.style.display='none';
+    root.innerHTML = renderWorkshopFinalized();
+    return;
+  }
+  // Training Task (interface familiarisation only) — fully separate from
+  // the research-stage system. TRAINING_VIEW is transient/in-memory (see
+  // its declaration), so this never touches VIEW_STAGE, PKG.progress.
+  // currentStage/currentScreen, or completedStages. Reuses the same Panel
+  // Studio mount point (#ps-native-root) the real stages use.
+  if(PKG && TRAINING_VIEW==='studio'){
+    psContainer.style.display='flex';
+    loadTrainingIntoPanelStudio();
+    return;
+  }
+  if(PKG && TRAINING_VIEW==='brief'){
+    psContainer.style.display='none';
+    root.innerHTML = renderTrainingBrief();
+    return;
+  }
+  if(PKG && (!VIEW_STAGE || !PKG.stages[VIEW_STAGE])) VIEW_STAGE = PKG.progress.currentStage;
+  const showingActivity = PKG && VIEW_STAGE && VIEW_STAGE===PKG.progress.currentStage && PKG.progress.currentScreen==='activity';
+  if(showingActivity){
+    psContainer.style.display='flex';
+    loadTaskIntoPanelStudio(VIEW_STAGE);
+    return; // #root stays as-is underneath — no need to touch it while hidden
+  }
+  psContainer.style.display='none';
+  if(!PKG){ root.innerHTML = renderImportScreen(); return; }
+  // A Shared Workshop Package carries no participant identity — collect it
+  // before anything else (even the package-verify step, which needs a name
+  // to show). Once submitParticipantRegistration() sets PKG.participant,
+  // this never matches again for this session.
+  if(PKG.packageMode==='shared' && !PKG.participant){ root.innerHTML = renderParticipantRegistration(); return; }
+  if(!PKG.progress.packageConfirmed){ root.innerHTML = renderVerifyPackage(); return; }
+  // Shown once before the first activity — deliberately transient (never
+  // written to PKG, per "do not change any package schema"), so it resets
+  // on a fresh page load rather than being a persistent "seen it" flag.
+  if(!WELCOME_SEEN){ root.innerHTML = renderWelcomeScreen(); return; }
+  if(!hasAnyAssignedStage(PKG)){ root.innerHTML = renderDashboard() + renderNoActivitiesAssigned(); return; }
+  // Pre-study survey — shown once, right after Welcome, before the first
+  // activity. Gated on PKG.share.survey (same flag every other survey
+  // uses) and on not having started any stage yet, so a package already
+  // mid-workshop before this feature existed is never retroactively
+  // interrupted with it (backward compatibility).
+  const prestudyStarted = (PKG.lifecycleLog||[]).some(e=>e && e.type==='stage_entered');
+  if(PKG.share.survey && !isSurveySubmittedFor('prestudy') && !prestudyStarted){ root.innerHTML = renderPrestudyScreen(); return; }
+  if(STAGE_JUST_COMPLETED){ root.innerHTML = renderStageCompleteScreen(STAGE_JUST_COMPLETED.stageKey, STAGE_JUST_COMPLETED.next); return; }
+  if(SURVEY_JUST_COMPLETED){ root.innerHTML = renderSurveyCompleteScreen(SURVEY_JUST_COMPLETED.stageKey); return; }
+  const reviewingPast = VIEW_STAGE !== PKG.progress.currentStage;
+  // Brief now holds the full recap (uploads, survey status, complete action),
+  // so reviewing a different stage lands on its Brief, not its Survey.
+  const screen = reviewingPast ? 'brief' : PKG.progress.currentScreen;
+  // Final Reflection is workshop-level (not tied to VIEW_STAGE) — its own
+  // full-bleed screen, same treatment as the survey/landing/completion ones.
+  if(screen==='final_reflection'){ root.innerHTML = renderFinalReflectionScreen(); return; }
+  // Survey is a full-bleed screen of its own (see renderStageReflect) — the
+  // dashboard header/rail is deliberately omitted while it's showing, same
+  // as the landing/welcome/completion screens above.
+  const mainHTML = VIEW_STAGE ? (screen==='reflect' ? renderStageReflect(VIEW_STAGE) : renderStageBrief(VIEW_STAGE)) : '';
+  root.innerHTML = (screen==='reflect' ? '' : renderDashboard()) + mainHTML;
+}
+function renderNoActivitiesAssigned(){
+  return `<div class="ff-main"><div class="card" style="border-color:var(--ink)">
+    <p>No study activities have been assigned in this participant package. Please contact the researcher.</p>
+  </div></div>`;
+}
+// Manual escape hatch — leaving Studio *without* finishing (Finish itself
+// now navigates straight to Survey via the onComplete callback above).
+// Returns to Brief, which is the primary hub in the redesigned workflow.
+async function backToTask(){
+  if(PKG.progress.currentScreen==='activity' && VIEW_STAGE){
+    await snapshotActivity(VIEW_STAGE);
+    logLifecycle('activity_exited', VIEW_STAGE);
+  }
+  PKG.progress.currentScreen='brief';
+  render();
+}
+
+function renderImportScreen(){
+  return `<div class="land-hero">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Design in motion.<br>Panels in your hands.</h1>
+    <p class="sub">A hands-on workshop for exploring how flat panels become three-dimensional garments — and back again. Import the task package your researcher gave you to begin, or open a progress file you saved earlier to continue.</p>
+    <div class="land-card">
+      <div class="land-dropzone" onclick="document.getElementById('pkgInput').click()">
+        <div class="ico">⤓</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">Choose your task package file</div>
+        <div class="faint" style="font-size:12px">a .json file from your researcher, or your own saved progress file</div>
+      </div>
+      <input type="file" id="pkgInput" accept="application/json,.json" style="display:none" onchange="openPackageFile(this)">
+    </div>
+  </div>`;
+}
+
+// Shown once, only for a Shared Workshop Package, before anything else —
+// this is the one point where a shared file becomes THIS participant's own
+// returned file. Nothing here is written back to the original shared file
+// (there's no way to — the participant only ever has the copy they opened);
+// it only sets PKG.participant on this in-memory copy, exactly like an
+// Assigned package already has from the moment the researcher exported it.
+function renderParticipantRegistration(){
+  return `<div class="land-hero">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Before we begin</h1>
+    <p class="sub">This is a shared workshop file — please tell us who you are. This stays only in the copy you save and return to your researcher.</p>
+    <div class="land-card" style="text-align:left">
+      <div class="eyebrow">Full name</div>
+      <input type="text" id="regName" placeholder="Your name">
+      <div class="eyebrow" style="margin-top:16px">Email</div>
+      <input type="email" id="regEmail" placeholder="name@example.com">
+      <div class="eyebrow" style="margin-top:16px">Phone number</div>
+      <input type="tel" id="regPhone" placeholder="+91 …">
+      <button class="btn blue block" style="margin-top:20px" onclick="submitParticipantRegistration()">Continue →</button>
+    </div>
+  </div>`;
+}
+function submitParticipantRegistration(){
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  if(!name || !email || !phone){ alert('Please fill in your name, email, and phone number.'); return; }
+  // Generated client-side, matched (or auto-added as a new participant) by
+  // the Console's importParticipantPackage() when this file comes back —
+  // see that function's packageMode==='shared' branch.
+  const code = (name.replace(/\s+/g,'').slice(0,12).toUpperCase()||'P') + '-' + Date.now().toString(36).slice(-4).toUpperCase();
+  PKG.participant = { id:code, code, name, email, phone };
+  currentPkgFileName = toReturnedFileName(name);
+  render();
+}
+function renderVerifyPackage(){
+  const p = PKG.participant||{};
+  const assignedNames = STAGE_ORDER.filter(sk=>PKG.stages[sk] && PKG.stages[sk].assigned).map(sk=>STAGE_NAME[sk]);
+  const initial = (p.name||'?').trim().charAt(0).toUpperCase();
+  return `<div class="land-hero">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Welcome back</h1>
+    <p class="sub">Check the details below before you begin the workshop.</p>
+    <div class="land-card" style="text-align:left">
+      <div class="land-identity">
+        <div class="avatar">${esc(initial)}</div>
+        <div>
+          <div style="font-size:16px;font-weight:700">${esc(p.name||'')}</div>
+          <div class="faint mono" style="font-size:12px">${esc(p.code||'')}</div>
+        </div>
+      </div>
+      <div class="eyebrow">Your assigned activities</div>
+      <div style="font-size:13px;margin-top:4px">${assignedNames.length?assignedNames.map(esc).join(' · '):'<span class="faint">nothing assigned yet</span>'}</div>
+      <div class="row" style="margin-top:24px;gap:10px">
+        <button class="btn blue block" onclick="confirmPackage()">Yes, this is my package — start</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn ghost block" onclick="document.getElementById('pkgInputVerify').click()">📂 Open a different package</button>
+        <input type="file" id="pkgInputVerify" accept="application/json,.json" style="display:none" onchange="openPackageFile(this)">
+      </div>
+    </div>
+  </div>`;
+}
+function confirmPackage(){
+  PKG.progress.packageConfirmed = true;
+  render();
+}
+// Shown once, right before the first activity. Same design pattern as a
+// Brief page (see briefIntroHTML/briefStepsHTML/briefReminderHTML) — short
+// narrative, 3 numbered guidance steps, the same Remember callout used
+// throughout, one Continue button — so the whole intro→Brief→Final
+// Reflection sequence reads as one coherent experience. Purely
+// instructional; dismissing it only flips the transient WELCOME_SEEN flag.
+function renderWelcomeScreen(){
+  return `<div class="land-hero">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Before you begin</h1>
+    <p class="sub">A short note on what this workshop is about and how to approach it.</p>
+    <div class="land-card" style="text-align:left">
+      ${briefIntroHTML('This workshop is part of a research study on how design students translate garments between flat 2D panels and three-dimensional forms.')}
+      ${briefStepsHTML([
+        'Work through your assigned activities on your own, in the order they appear.',
+        'Read each Brief before starting — it explains what to do, not how to solve it.',
+        'If you feel stuck, optional Hint images can be revealed during some activities.',
+      ])}
+      ${briefReminderHTML()}
+      <button class="btn blue block" style="margin-top:20px" onclick="dismissWelcome()">Continue →</button>
+    </div>
+  </div>`;
+}
+function dismissWelcome(){ WELCOME_SEEN = true; render(); }
+
+// ── Training Task (interface familiarisation only) ──────────────────────
+// Not a research stage: never touches PKG.stages, PKG.progress.currentStage/
+// currentScreen, or completedStages. See TRAINING_VIEW's declaration and
+// migratePackage()'s schemaVersion 6 block for the rest of the picture.
+function renderTrainingBrief(){
+  return `<div class="land-hero">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Training Task</h1>
+    <p class="sub">This short activity will help you become familiar with the Panel Studio tools.</p>
+    <div class="land-card" style="text-align:left">
+      ${briefIntroHTML('You will see three simple shapes: Circle, Triangle, Square. Your task is simply to trace each shape using the drawing tools.')}
+      ${briefStepsHTML([
+        'Select a shape from the Panel Tray and place it onto the workspace.',
+        'Use the Pen tool to trace its outline — try the other tools too if you like.',
+        'When you have finished tracing the shapes, select Finish Training.',
+      ])}
+      ${briefReminderHTML('This is only a practice activity to help you become familiar with the interface. Your performance here is not part of the study.')}
+      <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+        <button class="btn ghost" onclick="exitTrainingBriefToOverview()">← Back to overview</button>
+        <button class="btn blue" onclick="beginTrainingStudio()">Start Training Task →</button>
+      </div>
+    </div>
+  </div>`;
+}
+function startTrainingTask(){ TRAINING_VIEW = 'brief'; render(); }
+function exitTrainingBriefToOverview(){ TRAINING_VIEW = null; render(); }
+function beginTrainingStudio(){
+  logLifecycle('training_entered', 'training');
+  trainingLoaded = false; // force a fresh, blank workspace on every "Start"/"Repeat"
+  TRAINING_VIEW = 'studio';
+  render();
+}
+// Mirrors loadTaskIntoPanelStudio()'s shape, but deliberately never reads/
+// writes PKG.stages — reuses the exact same Panel Studio mount point and
+// tool behaviour, with three generic training shapes standing in for a
+// garment's panel tray (see TRAINING_SHAPES — no garment images, hints or
+// scaffolds are ever passed in).
+function loadTrainingIntoPanelStudio(){
+  PanelStudio.mount(document.getElementById('ps-native-root'));
+  PanelStudio.setReadOnly(false);
+  if(trainingLoaded) return; // already loaded this session — don't wipe in-progress tracing on a re-render
+  trainingLoaded = true;
+  const task = {
+    flatform_task:true, stage:'training',
+    garment:{ name:'', type:'', image:'', frontBackImage:'', flatSketchImage:'', groupPanelImage:'', scaffold4Image:'' },
+    complexity:'', styleLine:null,
+    panels: TRAINING_SHAPES,
+    individualPanelTray: [],
+    references: null,
+    brief: 'Trace each shape using the drawing tools. This is only a practice activity — it is not part of the study.',
+    budgetMin: null,
+    participantCode: (PKG.participant && PKG.participant.code) || '',
+    exportId: 'training',
+  };
+  PanelStudio.applyTaskFile(task);
+  PanelStudio.setReferenceUnlockState(0);
+}
+// Finish Training — deliberately NOT the research-stage Complete Stage
+// path (see PanelStudio.onComplete's stageKey==='training' branch below):
+// no survey, no stage-completion bookkeeping, no lock. Just a completion
+// timestamp the participant can overwrite by repeating the task later.
+function finishTrainingTask(){
+  if(!PKG) return;
+  if(!PKG.training) PKG.training = { completedAt:null };
+  PKG.training.completedAt = new Date().toISOString();
+  logLifecycle('training_completed', 'training');
+  TRAINING_VIEW = null;
+  trainingLoaded = false;
+  toast('Training Task complete — you can repeat it anytime from the overview.');
+  render();
+}
+
+// Only used on Brief now (Studio/Survey are their own full-bleed screens) —
+// a strong page-identity heading for the current step, not a thin tab
+// strip, so the participant always knows which page they're on. The other
+// two steps still show, smaller, as a trailing breadcrumb for context.
+function renderTabStrip(){
+  const screen = PKG.progress.currentScreen;
+  const steps=[['brief','Brief'],['activity','Studio'],['reflect','Survey']];
+  const idx = Math.max(0, steps.findIndex(([k])=>k===screen));
+  const trail = steps.filter((_,i)=>i!==idx).map(([,label])=>label).join(' · ');
+  return `<div class="ff-pagehead">
+    <div class="ff-pagehead-title">${String(idx+1).padStart(2,'0')} — ${steps[idx][1]}</div>
+    <div class="ff-pagehead-trail">${esc(trail)}</div>
+  </div>`;
+}
+function renderDashboard(){
+  const assignedStages = STAGE_ORDER.filter(sk=>PKG.stages[sk] && PKG.stages[sk].assigned);
+  const doneCount = (PKG.progress.completedStages||[]).length;
+  const totalAssigned = assignedStages.length;
+  const pct = totalAssigned ? Math.round(doneCount/totalAssigned*100) : 0;
+  const studioMs = computeTotalStudioTime();
+  const rows = assignedStages.map((sk)=>{
+    const isDone = (PKG.progress.completedStages||[]).includes(sk);
+    const isCurrent = sk===PKG.progress.currentStage;
+    const locked = !isDone && !isCurrent;
+    let cls='stage-row'+(isDone?' done':'')+(isCurrent?' current':'')+(locked?' locked':'');
+    const orderNum = STAGE_ORDER.indexOf(sk)+1;
+    return `<div class="${cls}" ${(!locked)?`onclick="VIEW_STAGE='${sk}';render();"`:''}>
+      <div class="stagenum">${String(orderNum).padStart(2,'0')}</div>
+      <div class="stage-row-name">${STAGE_NAME[sk].split(' · ')[0]}</div>
+      <div class="stage-row-time">${STAGE_TIME_BUDGET[sk]||''}</div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="ff-header">
+      <div class="ff-header-brand">
+        <span class="ff-header-app">Flat ⇄ Form</span>
+        <span class="ff-header-participant">${esc(PKG.participant.name)}</span>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn ghost" style="padding:7px 12px;font-size:12px" onclick="document.getElementById('pkgInput2').click()">📂 Open a different file</button>
+        <input type="file" id="pkgInput2" accept="application/json,.json" style="display:none" onchange="openPackageFile(this)">
+      </div>
+    </div>
+    <div class="ff-rail">
+      <div class="eyebrow">Your assigned activities</div>
+      <div class="big-frac">${doneCount}<span class="of">/${totalAssigned}</span></div>
+      <div class="faint" style="font-size:12px;margin-top:2px">${totalAssigned?'assigned activities completed':'nothing assigned yet'} · ${fmtDuration(studioMs)} total in studio</div>
+      <div class="progressbar"><i style="width:${pct}%"></i></div>
+      <div class="stage-list">${rows||'<p class="faint" style="font-size:13px;padding:8px 0">Nothing assigned to you yet — check with your researcher.</p>'}</div>
+      <div class="rail-note">Work activity by activity: the studio task opens in Studio, its survey in Survey. An activity counts as complete once the studio task, upload and survey are done.</div>
+      <div class="training-block">
+        <div class="training-eyebrow">Training Task</div>
+        <div class="training-desc">Optional · Familiarise yourself with Panel Studio</div>
+        ${PKG.training && PKG.training.completedAt ? '<div class="training-done">✓ Completed — you can repeat it anytime</div>' : ''}
+        <button class="btn ghost" style="padding:7px 12px;font-size:12px" onclick="startTrainingTask()">${PKG.training && PKG.training.completedAt ? 'Repeat Training Task' : 'Start Training Task'}</button>
+      </div>
+      ${SHOW_SAVE_BUTTONS?`<div class="rail-foot">
+        <button class="btn ghost" onclick="savePause()">⏸ Save &amp; pause</button>
+        <button class="btn green" onclick="saveProgress()">💾 Save progress</button>
+      </div>`:''}
+    </div>`;
+}
+
+function scaffoldImagesHTML(g){
+  if(!g) return '<p class="faint" style="font-size:13px">No garment assigned for this stage yet — check with your researcher.</p>';
+  const figs=[];
+  if(g.fullImg) figs.push(['Full garment',g.fullImg]);
+  if(g.frontBackImg) figs.push(['Front & back',g.frontBackImg]);
+  if(g.flatSketchImg) figs.push(['Flat sketch',g.flatSketchImg]);
+  if(!figs.length) return '<p class="faint" style="font-size:13px">No reference images attached to this garment.</p>';
+  return `<div class="scaffold-imgs">${figs.map(([label,src])=>`<figure><img src="${src}"><figcaption>${label}</figcaption></figure>`).join('')}</div>`;
+}
+
+function markedSetsHTML(g){
+  if(!g || !g.markedSets || !g.markedSets.length) return '';
+  return g.markedSets.map((ms,i)=>{
+    const figs=[];
+    if(ms.full) figs.push(['Full garment',ms.full]);
+    if(ms.frontBack) figs.push(['Front & back',ms.frontBack]);
+    if(ms.flatSketch) figs.push(['Flat sketch',ms.flatSketch]);
+    if(!figs.length) return '';
+    return `<div style="margin-top:10px"><div class="faint" style="font-size:12px;font-weight:600;margin-bottom:4px">Marked-area option ${i+1}</div>
+      <div class="scaffold-imgs">${figs.map(([label,src])=>`<figure><img src="${src}"><figcaption>${label}</figcaption></figure>`).join('')}</div></div>`;
+  }).join('');
+}
+
+function downloadTaskFileForPanelStudio(stageKey){
+  const st = PKG.stages[stageKey];
+  if(!st || !st.assigned){ alert('This stage has not been assigned by your researcher yet.'); return; }
+  const g = st.garment || {};
+  const task = {
+    flatform_task: true,
+    stage: stageKey,
+    garment: { name:g.name, type:g.type, image:g.fullImg||'', frontBackImage:g.frontBackImg||'', flatSketchImage:g.flatSketchImg||'', groupPanelImage:g.arrangementScaffold||'', scaffold4Image:g.fullArrangementPng||'' },
+    complexity: {s:'Simple',m:'Moderate',c:'Complex'}[st.cx]||st.cx,
+    styleLine: st.styleLine || null,
+    panels: (st.tray||[]).map(item=>({ image:item.img||null, shape:item.shape||null, label:item.label })),
+  };
+  const json = JSON.stringify(task, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const reader = new FileReader();
+  reader.onload = function(){
+    const a=document.createElement('a'); a.href=reader.result; a.download='task-'+stageKey+'-'+(g.name||'garment').replace(/\s+/g,'-')+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Task file downloaded — open Panel Studio and use "Import task"');
+  };
+  reader.onerror=function(){ alert('Could not build the task file.'); };
+  reader.readAsDataURL(blob);
+}
+
+// ── Generalized survey engine (Survey Revision) ──────────────────────────
+// Supports the five real stage keys (pretest/s1/s2/s3/posttest) plus two
+// workshop-level, non-stage keys: 'prestudy' and 'final'. All three kinds
+// of survey share this exact same question-rendering/answer-storage code —
+// only WHERE the answers live differs, resolved once here rather than
+// duplicated per kind. Stage-key behaviour is unchanged from before this
+// generalization: same object (PKG.stages[key].response), same field
+// shapes, same completeStage() hookup.
+function surveyDefFor(key){
+  if(key==='prestudy') return PRESTUDY_DEF;
+  if(key==='final') return FINAL_REFLECTION_DEF;
+  return SURVEYDEF[key];
+}
+function surveyAnswersFor(key){
+  const def = surveyDefFor(key);
+  if(key==='prestudy'){
+    if(!PKG.preStudy) PKG.preStudy = { response:{ survey:null }, submittedAt:null };
+    if(!PKG.preStudy.response) PKG.preStudy.response = { survey:null };
+    if(!PKG.preStudy.response.survey) PKG.preStudy.response.survey = def.qs.map(()=>null);
+    return PKG.preStudy.response.survey;
+  }
+  if(key==='final'){
+    if(!PKG.finalReflection) PKG.finalReflection = { response:{ survey:null }, submittedAt:null };
+    if(!PKG.finalReflection.response) PKG.finalReflection.response = { survey:null };
+    if(!PKG.finalReflection.response.survey) PKG.finalReflection.response.survey = def.qs.map(()=>null);
+    return PKG.finalReflection.response.survey;
+  }
+  const st = PKG.stages[key];
+  if(!st.response) st.response = emptyResponse();
+  if(!st.response.survey) st.response.survey = def.qs.map(()=>null);
+  return st.response.survey;
+}
+function isSurveySubmittedFor(key){
+  if(key==='prestudy') return !!(PKG.preStudy && PKG.preStudy.submittedAt);
+  if(key==='final') return !!(PKG.finalReflection && PKG.finalReflection.submittedAt);
+  const st = PKG.stages[key];
+  return !!(st.response && st.response.submittedAt);
+}
+// One-question-at-a-time survey UI position — transient/per-session only
+// (like VIEW_STAGE, psLoadedForStage, etc.), never persisted to PKG. The
+// underlying answer engine (surveyAnswersFor, setSurveyAnswer,
+// toggleSurveyMulti) is completely unchanged by this.
+let SURVEY_UI = {};
+function surveyIsAnswered(val){
+  if(val==null) return false;
+  if(Array.isArray(val)) return val.length>0;
+  if(typeof val==='string') return val.trim().length>0;
+  return true;
+}
+function surveyInitUI(key, def, ans){
+  if(SURVEY_UI[key]) return SURVEY_UI[key];
+  const firstUnanswered = def.qs.findIndex((q,i)=>!surveyIsAnswered(ans[i]));
+  const allAnswered = firstUnanswered===-1;
+  SURVEY_UI[key] = { idx: allAnswered?0:firstUnanswered, done: allAnswered };
+  return SURVEY_UI[key];
+}
+// Lets the currently-visible question card play its exit animation before
+// the DOM underneath it is replaced — render() always does a full innerHTML
+// swap, so this is the only way to get a real outgoing transition rather
+// than a hard cut.
+function surveyTransition(cb){
+  const active = document.querySelector('.sv-shell .sv-card');
+  if(active){ active.classList.add('leaving'); setTimeout(cb, 180); }
+  else cb();
+}
+function surveyGo(key, delta){
+  const ui = SURVEY_UI[key]; if(!ui) return;
+  const max = surveyDefFor(key).qs.length-1;
+  const next = Math.max(0, Math.min(max, ui.idx+delta));
+  if(next===ui.idx) return;
+  surveyTransition(()=>{ ui.idx = next; render(); });
+}
+function surveyFinish(key){
+  const ui = SURVEY_UI[key]; if(!ui) return;
+  surveyTransition(()=>{
+    ui.done = true;
+    if(key==='prestudy'){
+      PKG.preStudy.submittedAt = new Date().toISOString();
+      PKG.progress.currentScreen = 'brief';
+      render();
+      return;
+    }
+    if(key==='final'){
+      PKG.finalReflection.submittedAt = new Date().toISOString();
+      PKG.progress.currentScreen = 'brief';
+      render();
+      return;
+    }
+    // Finishing the last survey question is the last thing this stage
+    // needs — it completes itself right here, no separate "Mark stage
+    // complete" click. completeStage() sets response.submittedAt (if not
+    // already set), adds this stage to completedStages, advances
+    // progress.currentStage to the next assigned stage (unlocking its row
+    // in the left rail) while leaving VIEW_STAGE on THIS stage, so the
+    // participant lands back on this stage's own Brief showing both
+    // checkmarks — not an interstitial, and not the next stage's Brief.
+    completeStage(key);
+  });
+}
+function surveyReview(key){
+  const ui = SURVEY_UI[key]; if(!ui) return;
+  surveyTransition(()=>{ ui.idx = 0; ui.done = false; render(); });
+}
+function surveyFormHTML(key){
+  const def = surveyDefFor(key);
+  if(!def) return '';
+  const ans = surveyAnswersFor(key);
+  const ui = surveyInitUI(key, def, ans);
+  if(ui.done){
+    const answeredCount = def.qs.filter((q,i)=>surveyIsAnswered(ans[i])).length;
+    return `<div class="card sv-card sv-complete">
+      <div class="sv-stage-label">${esc(def.title)}</div>
+      <div class="ico">✓</div>
+      <div class="sv-complete-title">Survey complete</div>
+      <p class="faint" style="font-size:14px;margin-top:8px">${answeredCount} of ${def.qs.length} questions answered.</p>
+      <button class="btn ghost" style="margin-top:22px" onclick="surveyReview('${key}')">Review your answers</button>
+    </div>`;
+  }
+  const i = ui.idx, q = def.qs[i], isLast = i===def.qs.length-1;
+  let qHTML;
+  if(q.t==='likert'){
+    // q.labels (added for the Final Refinement question bank) gives each of
+    // the 5 points its own caption, shown under its circle — otherwise fall
+    // back to the older two-endpoint-only display for any def that doesn't
+    // set it.
+    const opts=[1,2,3,4,5].map(v=>{
+      const lbl = q.labels ? q.labels[v-1] : '';
+      return `<label><input type="radio" name="sv_${key}_${i}" value="${v}" ${ans[i]==v?'checked':''} onchange="setSurveyAnswer('${key}',${i},${v})"><span class="sv-likert-circle">${v}</span>${lbl?`<span class="sv-likert-label">${esc(lbl)}</span>`:''}</label>`;
+    }).join('');
+    qHTML = q.labels
+      ? `<div class="likert likert-labeled"><div class="opts">${opts}</div></div>`
+      : `<div class="likert"><span class="end">${q.ends[0]}</span><div class="opts">${opts}</div><span class="end">${q.ends[1]}</span></div>`;
+  } else if(q.t==='single'){
+    // An option literally named "Other" / "Other (please specify)" reveals
+    // an inline free-text field (shown via CSS once its radio is checked —
+    // see .opt-other in the stylesheet) — the typed text is folded into the
+    // stored answer as "Other: <text>" so it stays a plain string, same as
+    // every other single-choice answer.
+    const opts=q.opts.map(o=>{
+      const isOther = /^other\b/i.test(o);
+      if(!isOther) return `<label><input type="radio" name="sv_${key}_${i}" ${ans[i]===o?'checked':''} onchange="setSurveyAnswer('${key}',${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</label>`;
+      const curVal = ans[i];
+      const checked = typeof curVal==='string' && /^other\b/i.test(curVal);
+      const otherText = checked ? curVal.replace(/^other:\s*/i,'') : '';
+      return `<label class="opt-other"><input type="radio" name="sv_${key}_${i}" ${checked?'checked':''} onchange="setSurveyOtherSingle('${key}',${i})">${esc(o)}<input type="text" class="other-input" placeholder="Please specify…" value="${esc(otherText)}" oninput="setSurveyOtherText('${key}',${i},this.value)" onclick="event.stopPropagation()"></label>`;
+    }).join('');
+    qHTML = `<div class="optlist">${opts}</div>`;
+  } else if(q.t==='multi'){
+    const cur = Array.isArray(ans[i])?ans[i]:[];
+    const opts=q.opts.map(o=>{
+      const isOther = /^other\b/i.test(o);
+      if(!isOther) return `<label><input type="checkbox" ${cur.includes(o)?'checked':''} onchange="toggleSurveyMulti('${key}',${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</label>`;
+      const otherEntry = cur.find(v=>typeof v==='string' && /^other\b/i.test(v));
+      const otherText = otherEntry ? otherEntry.replace(/^other:\s*/i,'') : '';
+      return `<label class="opt-other"><input type="checkbox" ${otherEntry?'checked':''} onchange="toggleSurveyMultiOther('${key}',${i})">${esc(o)}<input type="text" class="other-input" placeholder="Please specify…" value="${esc(otherText)}" oninput="setSurveyMultiOtherText('${key}',${i},this.value)" onclick="event.stopPropagation()"></label>`;
+    }).join('');
+    qHTML = `<div class="optlist">${opts}</div>`;
+  } else if(q.t==='rank'){
+    qHTML = rankQuestionHTML(key, i, q, ans[i]);
+  } else {
+    qHTML = `<textarea oninput="setSurveyAnswer('${key}',${i},this.value)">${esc(ans[i]||'')}</textarea>`;
+  }
+  return `<div class="card sv-card">
+    <div class="sv-qbody">
+      <div class="sv-eyebrow-row">
+        <span class="sv-stage-label">${esc(def.title)}</span>
+        <span class="sv-qcount">Question ${i+1} of ${def.qs.length}</span>
+      </div>
+      <div class="qtitle">${esc(q.q)}</div>
+      ${qHTML}
+    </div>
+    <div class="sv-nav">
+      <button class="btn ghost" ${i===0?'disabled':''} onclick="surveyGo('${key}',-1)">← Back</button>
+      ${isLast?`<button class="btn blue" onclick="surveyFinish('${key}')">Finish</button>`:`<button class="btn blue" onclick="surveyGo('${key}',1)">Next →</button>`}
+    </div>
+  </div>`;
+}
+function setSurveyAnswer(key,i,val){ surveyAnswersFor(key)[i]=val; }
+function toggleSurveyMulti(key,i,opt){
+  const arr = surveyAnswersFor(key);
+  if(!Array.isArray(arr[i])) arr[i]=[];
+  const at=arr[i].indexOf(opt);
+  if(at>-1) arr[i].splice(at,1); else arr[i].push(opt);
+}
+// ── "Other (please specify)" handling — single/multi questions whose last
+// option matches /^other\b/i. Selecting it (before any text is typed)
+// stores the bare string 'Other'; typing folds the text in as 'Other: …' so
+// the stored answer stays a plain string (single) / a plain array entry
+// (multi) exactly like every other option, no new data shape involved. ──
+function setSurveyOtherSingle(key,i){ surveyAnswersFor(key)[i]='Other'; }
+function setSurveyOtherText(key,i,text){
+  surveyAnswersFor(key)[i] = text.trim() ? ('Other: '+text) : 'Other';
+}
+function toggleSurveyMultiOther(key,i){
+  const arr = surveyAnswersFor(key);
+  if(!Array.isArray(arr[i])) arr[i]=[];
+  const idx=arr[i].findIndex(v=>typeof v==='string' && /^other\b/i.test(v));
+  if(idx>-1) arr[i].splice(idx,1); else arr[i].push('Other');
+}
+function setSurveyMultiOtherText(key,i,text){
+  const arr = surveyAnswersFor(key);
+  if(!Array.isArray(arr[i])) arr[i]=[];
+  const idx=arr[i].findIndex(v=>typeof v==='string' && /^other\b/i.test(v));
+  const val = text.trim() ? ('Other: '+text) : 'Other';
+  if(idx>-1) arr[i][idx]=val; else arr[i].push(val);
+}
+// "Rank" questions store the same shape as "multi" (an array of selected
+// option labels on the same answers array) — the only difference is that
+// here array ORDER is meaningful (most important/most used first) and
+// participant-controlled via drag, rather than incidental insertion order.
+// An option matching /^other\b/i gets the same inline free-text treatment
+// single/multi already have (toggleRankOtherAnswer/setRankOtherText),
+// folding typed text into 'Other: …' the same way.
+function rankQuestionHTML(key, i, q, val){
+  const cur = Array.isArray(val) ? val : [];
+  const chips = q.opts.map(o=>{
+    const isOther = /^other\b/i.test(o);
+    if(!isOther) return `<label class="rank-chip${cur.includes(o)?' on':''}"><input type="checkbox" ${cur.includes(o)?'checked':''} onchange="toggleRankAnswer('${key}',${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</label>`;
+    const otherEntry = cur.find(v=>typeof v==='string' && /^other\b/i.test(v));
+    const otherText = otherEntry ? otherEntry.replace(/^other:\s*/i,'') : '';
+    return `<label class="rank-chip opt-other${otherEntry?' on':''}"><input type="checkbox" ${otherEntry?'checked':''} onchange="toggleRankOtherAnswer('${key}',${i})">${esc(o)}<input type="text" class="other-input" placeholder="Please specify…" value="${esc(otherText)}" oninput="setRankOtherText('${key}',${i},this.value)" onclick="event.stopPropagation()"></label>`;
+  }).join('');
+  const bucket = cur.length ? `<div class="rank-bucket">${cur.map((o,ri)=>`
+    <div class="rank-item" draggable="true" data-idx="${ri}" ondragstart="rankDragStart(event,${ri})" ondragover="rankDragOver(event)" ondrop="rankDrop(event,'${key}',${i},${ri})" ondragend="rankDragEnd(event)">
+      <span class="rank-handle">⠿</span><span class="rank-num">${ri+1}</span><span class="rank-label">${esc(o)}</span>
+    </div>`).join('')}</div>`
+    : `<p class="faint rank-empty">Selected items will appear here — drag to put them in order.</p>`;
+  return `<div class="rank-q" data-stage="${key}" data-qidx="${i}">
+    <div class="rank-chips">${chips}</div>
+    ${cur.length?'<div class="rank-bucket-label">Drag to reorder</div>':''}
+    ${bucket}
+  </div>`;
+}
+// Checking/dragging inside this question must never trigger a full
+// render() — that replaces the *entire page*, destroying and recreating
+// .sv-card, which replays its entrance animation and resets .sv-qbody's
+// scroll position. That's exactly what caused the reported "jerk" and
+// ranked items intermittently vanishing behind the fold mid-drag. Instead,
+// only this question's own <div class="rank-q"> subtree is regenerated —
+// everything outside it (the card, the nav footer, the rest of the page)
+// is left completely untouched.
+function refreshRankQuestion(key, i){
+  const el = document.querySelector(`.rank-q[data-stage="${key}"][data-qidx="${i}"]`);
+  if(!el){ render(); return; }
+  el.outerHTML = rankQuestionHTML(key, i, surveyDefFor(key).qs[i], surveyAnswersFor(key)[i]);
+}
+function toggleRankAnswer(key, i, opt){
+  toggleSurveyMulti(key, i, opt);
+  refreshRankQuestion(key, i);
+}
+function toggleRankOtherAnswer(key, i){
+  toggleSurveyMultiOther(key, i);
+  refreshRankQuestion(key, i);
+}
+// No refreshRankQuestion() call on every keystroke here — same reasoning as
+// setSurveyOtherText/setSurveyMultiOtherText: re-rendering the subtree while
+// the participant is actively typing would steal focus mid-word. The typed
+// text is already visible in the input itself; the rank bucket's label
+// catches up next time this question's subtree is refreshed (toggling the
+// chip, dragging, or navigating away and back).
+function setRankOtherText(key, i, text){
+  const arr = surveyAnswersFor(key);
+  if(!Array.isArray(arr[i])) arr[i]=[];
+  const idx=arr[i].findIndex(v=>typeof v==='string' && /^other\b/i.test(v));
+  const val = text.trim() ? ('Other: '+text) : 'Other';
+  if(idx>-1) arr[i][idx]=val; else arr[i].push(val);
+}
+let _rankDragIdx = null;
+function rankDragStart(ev, idx){ _rankDragIdx = idx; ev.dataTransfer.effectAllowed='move'; }
+function rankDragOver(ev){ ev.preventDefault(); ev.dataTransfer.dropEffect='move'; }
+function rankDrop(ev, key, qIdx, targetIdx){
+  ev.preventDefault();
+  if(_rankDragIdx===null || _rankDragIdx===targetIdx){ _rankDragIdx=null; return; }
+  const arr = surveyAnswersFor(key);
+  const [moved] = arr[qIdx].splice(_rankDragIdx, 1);
+  arr[qIdx].splice(targetIdx, 0, moved);
+  _rankDragIdx = null;
+  refreshRankQuestion(key, qIdx);
+}
+function rankDragEnd(){ _rankDragIdx = null; }
+
+// ════════════════════════════════════════
+//  FINAL REFLECTION — workshop-level, shown once after every assigned
+//  stage is complete. Deliberately NOT modeled as a 6th PKG.stages entry
+//  (those all assume a garment/task/Studio activity, which this has none
+//  of) — instead a small standalone PKG.finalReflection field, created
+//  lazily on first access via surveyAnswersFor('final'). Its question flow
+//  (single/multi/rank/likert/open, "Other" free-text, rank drag-to-reorder)
+//  is the exact same generalized engine every stage survey uses — only the
+//  one-time intro card below is bespoke to this screen.
+// ════════════════════════════════════════
+function isFinalReflectionDone(){ return isSurveySubmittedFor('final'); }
+// idx:-1 is a one-time intro card — every fresh entry into Final Reflection
+// shows it before resuming at whichever question is actually next
+// unanswered (see finalReflectionStart()).
+function openFinalReflection(){ SURVEY_UI['final'] = { idx:-1, done:false }; PKG.progress.currentScreen='final_reflection'; render(); }
+function finalReflectionStart(){
+  const ui = SURVEY_UI['final']; if(!ui) return;
+  const ans = surveyAnswersFor('final');
+  const firstUnanswered = FINAL_REFLECTION_DEF.qs.findIndex((q,i)=>!surveyIsAnswered(ans[i]));
+  surveyTransition(()=>{ ui.idx = firstUnanswered===-1?0:firstUnanswered; render(); });
+}
+function renderFinalReflectionScreen(){
+  const def = FINAL_REFLECTION_DEF;
+  if(!SURVEY_UI['final']) SURVEY_UI['final'] = { idx:-1, done:false };
+  const ui = SURVEY_UI['final'];
+  const shell = (body) => `<div class="sv-shell">
+    <div class="sv-topbar">
+      <span class="sv-exit-link" onclick="PKG.progress.currentScreen='brief';render();">← Back to overview</span>
+      <span class="brand">Flat ⇄ Form</span>
+    </div>
+    <div class="sv-body">${body}</div>
+  </div>`;
+  if(ui.idx===-1){
+    return shell(`<div class="card sv-card" style="text-align:left">
+      <div class="sv-stage-label">${esc(def.title)}</div>
+      ${briefIntroHTML(def.intro.narrative)}
+      ${briefStepsHTML(def.intro.steps)}
+      ${briefReminderHTML(def.intro.reminder)}
+      <button class="btn blue" style="margin-top:20px" onclick="finalReflectionStart()">Continue →</button>
+    </div>`);
+  }
+  // Deliberately no saveProgress() on Finish — same reasoning as
+  // completeStage()/PanelStudio.onComplete: firing outside a real user
+  // gesture makes showSaveFilePicker() always throw, silently falling back
+  // to forcing an unprompted file download. The participant saves/exports
+  // explicitly via the "Save progress" or "Export Final Workshop Package"
+  // buttons that follow.
+  return shell(surveyFormHTML('final'));
+}
+// ════════════════════════════════════════
+//  PRE-STUDY SURVEY — workshop-level, shown once right after Welcome and
+//  before the first assigned activity. Same architecture as Final
+//  Reflection above (a standalone PKG.preStudy field, the same generalized
+//  survey engine, a one-time intro card) — deliberately not gated on any
+//  particular stage, and not shown again once submitted or once the
+//  participant has already started any stage (see render()'s dispatch),
+//  so an in-progress package from before this feature existed is never
+//  retroactively interrupted with it.
+// ════════════════════════════════════════
+function prestudyStart(){
+  const ui = SURVEY_UI['prestudy']; if(!ui) return;
+  const ans = surveyAnswersFor('prestudy');
+  const firstUnanswered = PRESTUDY_DEF.qs.findIndex((q,i)=>!surveyIsAnswered(ans[i]));
+  surveyTransition(()=>{ ui.idx = firstUnanswered===-1?0:firstUnanswered; render(); });
+}
+function renderPrestudyScreen(){
+  const def = PRESTUDY_DEF;
+  if(!SURVEY_UI['prestudy']) SURVEY_UI['prestudy'] = { idx:-1, done:false };
+  const ui = SURVEY_UI['prestudy'];
+  const shell = (body) => `<div class="sv-shell">
+    <div class="sv-topbar"><span class="brand">Flat ⇄ Form</span></div>
+    <div class="sv-body">${body}</div>
+  </div>`;
+  if(ui.idx===-1){
+    return shell(`<div class="card sv-card" style="text-align:left">
+      <div class="sv-stage-label">${esc(def.title)}</div>
+      ${briefIntroHTML(def.intro.narrative)}
+      ${briefStepsHTML(def.intro.steps)}
+      ${briefReminderHTML(def.intro.reminder)}
+      <button class="btn blue" style="margin-top:20px" onclick="prestudyStart()">Continue →</button>
+    </div>`);
+  }
+  return shell(surveyFormHTML('prestudy'));
+}
+
+function refQuestionsHTML(def){
+  if(!def) return '';
+  return def.groups.map(g=>`${g.h?`<div style="font-weight:600;font-size:12px;color:var(--ink-faint);margin-top:10px;text-transform:uppercase">${esc(g.h)}</div>`:''}
+    ${g.qs.map(q=>`<div class="refq">${esc(q)}</div>`).join('')}`).join('');
+}
+
+function promptInterviewHTML(stageKey){
+  const pd=PROMPTDEF[stageKey], id=INTERVIEWDEF[stageKey];
+  if(!pd && !id) return '';
+  const st=PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  let out='';
+  if(pd && PKG.share.prompt){
+    out+=`<div class="card"><h2>${esc(pd.title)}</h2>
+      <p class="sub">Your researcher will ask you these questions face-to-face while reviewing your work. Use the box below for your own notes/responses as you discuss.</p>
+      <div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg)">${refQuestionsHTML(pd)}</div>
+      <div style="margin-top:12px"><textarea placeholder="Notes from the discussion…" oninput="PKG.stages['${stageKey}'].response.promptNotes=this.value">${esc(st.response.promptNotes||'')}</textarea></div>
+    </div>`;
+  }
+  if(id && PKG.share.interview){
+    out+=`<div class="card"><h2>${esc(id.title)}</h2>
+      <p class="sub">A semi-structured interview with your researcher, face-to-face. Use the box below for your own notes/responses.</p>
+      <div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg)">${refQuestionsHTML(id)}</div>
+      <div style="margin-top:12px"><textarea placeholder="Notes from the interview…" oninput="PKG.stages['${stageKey}'].response.interviewNotes=this.value">${esc(st.response.interviewNotes||'')}</textarea></div>
+    </div>`;
+  }
+  return out;
+}
+
+// Integrated into the Studio card rather than a separate block — uploads
+// are one of the two things (alongside the Panel Studio snapshot) that
+// satisfy studioIsComplete(), so they belong inside that card, not
+// underneath the whole page.
+function uploadsHTML(stageKey){
+  const st=PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  const files = st.response.uploads||[];
+  const list = files.map((u,i)=>`<div class="filerow"><span>📎</span><span class="spacer">${esc(u.name)}</span><span class="faint">${(u.size/1024).toFixed(0)} KB</span><button class="btn ghost sm" onclick="removeUpload('${stageKey}',${i})" style="padding:2px 8px">✕</button></div>`).join('');
+  return `<div class="wf-uploads">
+    <div class="wf-uploads-head">
+      <span class="wf-uploads-label">${files.length?files.length+' file'+(files.length===1?'':'s')+' attached':'Attach files'}</span>
+      <label class="wf-uploads-add">+ Add<input type="file" multiple onchange="handleUploads('${stageKey}',this)" style="display:none"></label>
+    </div>
+    ${list?`<div class="filelist">${list}</div>`:'<p class="faint" style="font-size:11.5px;margin-top:6px">Panel arrangement export, Clo3D screenshots/project file, or photos of your physical construction.</p>'}
+  </div>`;
+}
+async function handleUploads(stageKey,input){
+  const files=[...input.files]; if(!files.length) return;
+  const st=PKG.stages[stageKey];
+  if(!st.response) st.response=emptyResponse();
+  st.response.uploads=st.response.uploads||[];
+  for(const f of files){
+    if(f.size>25*1024*1024) toast('"'+f.name+'" is quite large — this may take a moment.');
+    try{
+      const dataUrl=await readFileAsDataURL(f);
+      st.response.uploads.push({name:f.name,type:f.type,size:f.size,dataUrl,at:new Date().toISOString()});
+    }catch(err){ alert('Could not read "'+f.name+'": '+(err&&err.message||err)); }
+  }
+  input.value='';
+  render();
+  toast(files.length+' file(s) added');
+}
+function removeUpload(stageKey,i){ PKG.stages[stageKey].response.uploads.splice(i,1); render(); }
+
+// Visual confirmation only, in the same filerow style as Studio's uploads —
+// survey answers already live in PKG.stages[k].response.survey; this does
+// not create or touch an actual uploads[] entry (that array specifically
+// gates studioIsComplete(), so mixing survey data into it would corrupt
+// that signal). No action/link here on purpose — this must not invite the
+// participant back into a finished survey.
+function surveyRecordHTML(stageKey){
+  const def = SURVEYDEF[stageKey];
+  const ans = (PKG.stages[stageKey].response && PKG.stages[stageKey].response.survey) || [];
+  const answered = def ? def.qs.filter((q,i)=>surveyIsAnswered(ans[i])).length : 0;
+  const total = def ? def.qs.length : 0;
+  const sizeKB = (JSON.stringify(ans).length/1024).toFixed(1);
+  return `<div class="wf-uploads">
+    <div class="filelist"><div class="filerow"><span>📋</span><span class="spacer">survey-responses-${stageKey}.json</span><span class="faint">${sizeKB} KB</span></div></div>
+    <p class="faint" style="font-size:11px;margin-top:6px">${answered} of ${total} questions answered.</p>
+  </div>`;
+}
+
+// ── Stage asset roles (Priority 2 / Option C) ────────────────────────────
+// Only genuinely participant-facing documents are listed here. The Half
+// and Full Arrangement SVGs are deliberately excluded — they're internal
+// resources (the Half SVG in particular is the intended future authoritative
+// source Panel Studio will parse for panel geometry), never something a
+// participant has a reason to open, so they must not appear as downloads
+// on the Brief page. Task PDF was removed entirely (legacy field, dropped
+// by explicit request). Labels describe what the document IS to a
+// participant, not its file format — "Full arrangement reference", not
+// "Full Arrangement PDF". This is a standard stage asset now (it always
+// travels with the package — see stageAssetFields() in the Console — no
+// researcher toggle decides whether it's included); the visibility rule
+// lives entirely at the call site instead. For every stage except Stage 2,
+// renderStageBrief() only calls this once studioIsComplete(stageKey) is
+// true, so it never appears before the participant has submitted their own
+// attempt (it functions as a post-task solution comparison there). Stage 2
+// is the one deliberate exception (25-Minute Timed Construction Activity) —
+// there the Full Panel Arrangement is task input, not a solution, so
+// renderStageBrief() calls this unconditionally, before the construction
+// activity even starts. This renderer itself never branches on which stage
+// it is — the stage-aware decision belongs entirely to the call site — and
+// silently renders nothing if the asset doesn't exist for this garment.
+function stageDocumentsHTML(garment){
+  if(!garment) return '';
+  const docs=[
+    ['fullArrangementPdf','fullArrangementPdfName','Full arrangement reference','full-arrangement-reference.pdf'],
+  ].filter(([f])=>garment[f]);
+  if(!docs.length) return '';
+  return `<div class="wf-uploads" style="margin-top:12px">
+    <div class="wf-uploads-label">Documents</div>
+    <div class="filelist">${docs.map(([f,nf,label,fallback])=>`<div class="filerow"><span>📄</span><span class="spacer">${esc(label)}</span><a class="btn ghost sm" href="${garment[f]}" download="${esc(garment[nf]||fallback)}">⤓ Download</a></div>`).join('')}</div>
+  </div>`;
+}
+// Generic "Solution Image" — content varies by stage (full arrangement,
+// a construction photo, an annotated garment…) but the software never
+// branches on that; it just displays whatever PNG the researcher assigned
+// to this role, after the participant has completed the stage. This is now
+// the only "researcher's solution" concept — the legacy PDF-based
+// solutionCompareHTML()/solutionFile field was removed by explicit request
+// (it was already unused — see the removed DEFERRED UX ITEMS note above).
+function solutionImageHTML(stageKey){
+  const st=PKG.stages[stageKey];
+  const g=st.garment;
+  if(!g || !g.solutionImagePng) return '';
+  return `<div class="card" style="margin-top:16px"><h2>Researcher's solution</h2>
+    <p class="sub">Now that you've completed this stage, compare your work with the solution below.</p>
+    <img src="${g.solutionImagePng}" alt="Researcher's solution" style="max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:10px"/>
+  </div>`;
+}
+
+// Derived-only display metric (clarification #2) — computed fresh from PKG.lifecycleLog
+// entered/exited pairs each render; never written back to PKG.
+function computeTotalStudioTime(){
+  const log = (PKG && PKG.lifecycleLog) || [];
+  let totalMs = 0;
+  STAGE_ORDER.forEach(sk=>{
+    const events = log.filter(e=>e && e.stage===sk && (e.type==='activity_entered'||e.type==='activity_exited') && e.t)
+      .slice().sort((a,b)=>new Date(a.t)-new Date(b.t));
+    let enteredAt=null;
+    events.forEach(e=>{
+      if(e.type==='activity_entered'){ enteredAt=e.t; }
+      else if(enteredAt){ const ms=new Date(e.t)-new Date(enteredAt); if(Number.isFinite(ms)&&ms>=0) totalMs+=ms; enteredAt=null; }
+    });
+  });
+  return totalMs;
+}
+function fmtDuration(ms){
+  const mins = Math.round(ms/60000);
+  const h = Math.floor(mins/60), m = mins%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+function renderProgressTrail(compact){
+  const done = PKG.progress.completedStages||[];
+  const shortLabel = {pretest:'Pre',s1:'1',s2:'2',s3:'3',posttest:'Post'};
+  const nodes = STAGE_ORDER.map(sk=>{
+    const isDone = done.includes(sk);
+    const isCurrent = sk===VIEW_STAGE;
+    const cls = isDone?'done':(isCurrent?'current '+sk:'upcoming');
+    const label = compact?'':`<div class="trail-node-label${isCurrent?' on':''}">${STAGE_NAME[sk].split(' · ')[0]}</div>`;
+    return `<div class="trail-node"><div class="trail-circle ${cls}">${isDone?'✓':shortLabel[sk]}</div>${label}</div>`;
+  });
+  return `<div class="trail${compact?' compact':''}">${nodes.join('<div class="trail-connector"></div>')}</div>`;
+}
+function renderMicroStep(activeScreen){
+  const steps=[['brief','Brief'],['activity','Activity'],['reflect','Reflect']];
+  return `<div class="microstep">${steps.map(([k,label],i)=>`${i>0?'<span class="sep">›</span>':''}<span class="${activeScreen===k?'on':''}">${label}</span>`).join('')}</div>`;
+}
+
+// Compact, honest recap line — derived from data that's already tracked
+// (uploads array, survey answers); no new state introduced.
+function openSurveyTab(stageKey){ PKG.progress.currentScreen='reflect'; render(); }
+
+// ── Brief's finite-state workflow: exactly one enabled step at a time. ──
+// Durable (survives reload) — checks response.submittedAt, which
+// surveyFinish() sets at the exact moment the participant clicks Finish.
+// Deliberately NOT "every question has an answer": answering has never been
+// required to advance in this survey engine (surveyGo()'s Back/Next has no
+// answered-check either, predating this redesign) — requiring full
+// per-question completeness here would let the Survey screen declare
+// "complete" while stagePhase() disagreed, which was the actual bug.
+function surveyIsComplete(stageKey){
+  const def = SURVEYDEF[stageKey];
+  if(!def || !PKG.share.survey) return true; // no survey applies to this stage — treat as satisfied
+  const st = PKG.stages[stageKey];
+  return !!(st.response && st.response.submittedAt);
+}
+function studioIsComplete(stageKey){
+  const st = PKG.stages[stageKey];
+  // Two independent kinds of evidence: PanelStudio.onComplete's
+  // studioCompletedAt timestamp (the stage's actual studio work was
+  // finished), or a manually-attached file — some stages are
+  // physical-construction based and never touch Panel Studio at all, so
+  // their only possible evidence is an upload. Either satisfies this check;
+  // neither is required to also produce the other.
+  return !!st.studioCompletedAt || (((st.response&&st.response.uploads)||[]).length) > 0;
+}
+function stagePhase(stageKey){
+  if((PKG.progress.completedStages||[]).includes(stageKey)) return 'stage_complete';
+  if(!studioIsComplete(stageKey)) return 'studio_pending';
+  if(!surveyIsComplete(stageKey)) return 'studio_complete';
+  return 'survey_complete';
+}
+// Brief's finite-state workflow, presented as two large side-by-side
+// action cards (Studio / Survey) plus a single banner for the final
+// "Complete stage" action — same phase derivation as before (stagePhase(),
+// studioIsComplete(), surveyIsComplete()), only the markup changed from a
+// vertical numbered stepper to this integrated-dashboard layout.
+function renderWorkflowStepper(stageKey){
+  const st = PKG.stages[stageKey];
+  const phase = stagePhase(stageKey);
+  const hasSurvey = !!SURVEYDEF[stageKey] && PKG.share.survey;
+  const nextStage = getNextAssignedStage(PKG, [stageKey]);
+
+  // Studio card
+  const studioDone = phase!=='studio_pending';
+  const n = ((st.response&&st.response.uploads)||[]).length;
+  const studioStatus = studioDone
+    ? (n>0 ? `Studio work completed — ${n} file${n===1?'':'s'} attached` : 'Studio work completed')
+    : (STAGE_BRIEF[stageKey] && STAGE_BRIEF[stageKey].intro);
+  const studioCard = `<div class="wf-card ${studioDone?'done':'current'}">
+    <div class="wf-card-head">
+      <div class="wf-card-icon">${studioDone?'✓':'1'}</div>
+      <div class="wf-card-title">Studio</div>
+    </div>
+    <div class="wf-card-status">${studioStatus}</div>
+    ${(stageKey==='s2' && studioDone) ? `<div class="faint" style="font-size:11px;margin-top:2px">Stage 2 completed in ${fmtStudioDuration('s2')} · time budget: ${STAGE_TIME_BUDGET.s2}</div>` : ''}
+    <div class="wf-card-action">
+      ${studioDone
+        ? `<button class="btn ghost sm" onclick="openInPanelStudio('${stageKey}')">Review Submission</button>
+           <p class="faint" style="font-size:11px;margin-top:8px">Opens your finished work for viewing — you can still export a PDF/PNG or print it, but it can no longer be edited.</p>`
+        : `<button class="btn blue block" onclick="openInPanelStudio('${stageKey}')">${psLoadedForStage===stageKey?'← Continue working':esc(STAGE_VERB[stageKey])} → Studio</button>
+           <p class="faint" style="font-size:11px;margin-top:8px">Your time there is captured automatically. <a href="javascript:void(0)" onclick="downloadTaskFileForPanelStudio('${stageKey}')" style="color:inherit">Download task file instead</a> if it doesn't load.</p>`}
+    </div>
+    ${uploadsHTML(stageKey)}
+  </div>`;
+
+  // Survey card (omitted entirely if this stage has no survey). Once done,
+  // this is a passive confirmation only — no "Start Survey"/"Review" action
+  // — it should not invite the participant to reopen a finished survey.
+  let surveyCard = '';
+  if(hasSurvey){
+    const surveyDone = phase==='survey_complete' || phase==='stage_complete';
+    const locked = phase==='studio_pending';
+    surveyCard = `<div class="wf-card ${surveyDone?'done':(locked?'locked':'current')}">
+      <div class="wf-card-head">
+        <div class="wf-card-icon">${surveyDone?'✓':'2'}</div>
+        <div class="wf-card-title">Survey</div>
+      </div>
+      <div class="wf-card-status">${surveyDone?'Survey responses have been recorded.':locked?'Finish the studio task to unlock.':'A short survey about this stage.'}</div>
+      <div class="wf-card-action">
+        ${surveyDone?'':`<button class="btn blue block" ${locked?'disabled':''} onclick="openSurveyTab('${stageKey}')">Start Survey</button>`}
+      </div>
+      ${surveyDone?surveyRecordHTML(stageKey):''}
+    </div>`;
+  }
+
+  // Final state — once both cards above are done the stage has already
+  // completed itself automatically (see surveyFinish()/completeStage());
+  // this is a passive confirmation, never another button to press.
+  const stageDone = phase==='stage_complete';
+  const completeLocked = hasSurvey ? phase!=='survey_complete' && !stageDone : phase!=='studio_complete' && !stageDone;
+  let completeBanner;
+  if(stageDone){
+    // A Final Reflection is required before export whenever the researcher
+    // included one (PKG.share.finalReflection) — it's a workshop-level
+    // instrument, not tied to this or any stage, so it's gated here rather
+    // than as a 6th stage card. Once submitted (or if it was never
+    // required), the Export button appears exactly as before.
+    const needsFinalReflection = !!PKG.share.finalReflection && !isFinalReflectionDone();
+    completeBanner = nextStage
+      ? `<div class="wf-complete-banner done">
+           <div class="wf-complete-text"><b>All activities for this stage have been completed.</b><br><span class="faint" style="font-size:12.5px">Select <b>${esc(STAGE_NAME[nextStage].split(' · ')[0])}</b> from the left to continue.</span></div>
+         </div>`
+      : needsFinalReflection
+      ? `<div class="wf-complete-banner done">
+           <div class="wf-complete-text"><b>One last thing</b><br><span class="faint" style="font-size:12.5px">You've completed every activity assigned to you. Please answer a short final reflection before exporting your workshop file.</span></div>
+           <button class="btn blue" onclick="openFinalReflection()">Start Final Reflection →</button>
+         </div>`
+      : `<div class="wf-complete-banner done">
+           <div class="wf-complete-text"><b>End of workshop</b><br><span class="faint" style="font-size:12.5px">You've completed every activity assigned to you. Export your final workshop file below, then send it to your researcher along with any other files they asked for.</span></div>
+           <button class="btn green" onclick="exportFinalPackage()">⬇ Export Final Workshop Package</button>
+         </div>`;
+  } else if(completeLocked){
+    completeBanner = `<div class="wf-complete-banner locked">
+      <div class="wf-complete-text faint">Complete the ${hasSurvey?'studio task and survey':'studio task'} to finish this stage.</div>
+    </div>`;
+  } else {
+    // Only reachable for a stage with no survey (hasSurvey===false) — a
+    // survey-bearing stage completes itself the instant Finish is clicked
+    // (surveyFinish() calls completeStage() directly), so this manual path
+    // never fires for any stage defined in SURVEYDEF today.
+    completeBanner = `<div class="wf-complete-banner ready">
+      <div class="wf-complete-text"><b>Everything for this stage is done.</b></div>
+      <button class="btn green" onclick="completeStage('${stageKey}')">Mark stage complete${nextStage?' → '+esc(STAGE_NAME[nextStage].split(' · ')[0]):''}</button>
+    </div>`;
+  }
+
+  return `<div class="wf-row">${studioCard}${surveyCard}</div>${completeBanner}`;
+}
+
+// Short (1-2 sentence) participant-friendly narrative at the top of the
+// Brief page — why the activity exists, not what to do (that's
+// briefStepsHTML below).
+function briefIntroHTML(text){
+  if(!text) return '';
+  return `<p class="brief-intro">${esc(text)}</p>`;
+}
+// Exactly 3 numbered, action-oriented steps — what to do, never how to
+// solve it. Same structure on every stage (see STAGE_BRIEF).
+function briefStepsHTML(steps){
+  if(!steps || !steps.length) return '';
+  return `<ol class="brief-steps">${steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`;
+}
+// Small standing callout panel used identically across every introductory
+// screen (Brief pages, Welcome, Final Reflection) — same visual treatment
+// everywhere; defaults to REMEMBER_NOTE (Brief pages' and Welcome's usage),
+// but Final Reflection passes its own closing/thank-you text through the
+// same box so the whole sequence reads as one coherent design.
+function briefReminderHTML(text){
+  return `<div class="brief-reminder">${esc(text||REMEMBER_NOTE)}</div>`;
+}
+// Just the Task Image — the Front&Back/Flat-sketch/Panel-arrangement
+// scaffold set is intentionally Studio-only now (see the left-panel image
+// tabs there); Brief shows only the one primary reference image.
+function briefTaskImageHTML(g){
+  if(!g || !g.fullImg) return '<p class="faint" style="font-size:12px">No image attached.</p>';
+  return `<img class="brief-task-img" src="${g.fullImg}" alt="Task image">`;
+}
+function renderStageBrief(stageKey){
+  const st=PKG.stages[stageKey];
+  const isDone=(PKG.progress.completedStages||[]).includes(stageKey);
+  // Integrated dashboard: task brief + task image up top, then the
+  // Studio/Survey workflow cards and the single Complete-stage action below
+  // — no more stacked sections separated by <hr>. "Compare with the
+  // researcher's solution" is intentionally not shown here for now
+  // (solutionCompareHTML still exists, just unused) — see Section 4 of the
+  // brief this redesign came from.
+  // Stage 2 (25-Minute Timed Construction Activity) — the Full Panel
+  // Arrangement is task input here, not a post-task solution, so it must be
+  // visible and downloadable BEFORE the construction activity starts, not
+  // gated on studioIsComplete() like every other stage's stageDocumentsHTML
+  // call below. Positioned before renderWorkflowStepper() (which holds the
+  // "→ Studio" button) so the participant naturally sees it before starting.
+  const s2FullArrangementHTML = (stageKey==='s2' && st.garment && st.garment.fullArrangementPdf) ? `
+    <div class="card" style="margin-top:16px">
+      <h2>Full Panel Arrangement</h2>
+      <p class="sub">Download this panel arrangement before beginning the construction activity. You can access it again anytime during Stage 2.</p>
+      ${stageDocumentsHTML(st.garment)}
+    </div>` : '';
+  return `<div class="ff-main">${renderTabStrip()}<div class="screen">
+    <div class="eyebrow accent">Assigned by researcher</div>
+    <div class="row" style="align-items:baseline;gap:10px;flex-wrap:wrap">
+      <h1 style="margin-bottom:0">${STAGE_NAME[stageKey].split(' · ')[0]}</h1>
+      ${STAGE_TIME_BUDGET[stageKey]?`<span class="badge">${STAGE_TIME_BUDGET[stageKey]} budget</span>`:''}
+      ${isDone?'<span class="faint" style="font-size:12px">recorded</span>':''}
+    </div>
+    ${!st.assigned?'<div class="stepnote" style="margin-top:14px">Your researcher hasn\'t assigned a garment for this stage yet — check back once they have, or open an updated package file.</div>':`
+    <div class="brief-top card">
+      <div class="brief-top-grid">
+        <div class="brief-top-text">
+          ${briefIntroHTML(STAGE_BRIEF[stageKey] && STAGE_BRIEF[stageKey].intro)}
+          ${briefStepsHTML(STAGE_BRIEF[stageKey] && STAGE_BRIEF[stageKey].steps)}
+          ${st.styleLine?`<p style="margin-top:10px;font-size:13px"><b>Style line:</b> ${esc(st.styleLine)}</p>`:''}
+        </div>
+        <div class="brief-top-image">${briefTaskImageHTML(st.garment)}</div>
+      </div>
+      ${stageKey==='s3'?markedSetsHTML(st.garment):''}
+      ${briefReminderHTML()}
+    </div>
+    ${s2FullArrangementHTML}
+    ${renderWorkflowStepper(stageKey)}
+    ${stageKey!=='s2' && studioIsComplete(stageKey)?stageDocumentsHTML(st.garment):''}
+    ${isDone?solutionImageHTML(stageKey):''}`}
+  </div></div>`;
+}
+
+// Full-bleed, dashboard-free screen (mirrors the land-hero treatment used
+// for import/welcome/completion) — a guided questionnaire, not a form
+// embedded in the rest of the app's chrome. See render()'s dispatch: this
+// is the one screen that deliberately skips renderDashboard().
+function renderStageReflect(stageKey){
+  const def = SURVEYDEF[stageKey];
+  const hasSurvey = !!(PKG.share.survey && def);
+  let progressPct = 0;
+  if(hasSurvey){
+    const st = PKG.stages[stageKey];
+    if(!st.response) st.response = emptyResponse();
+    if(!st.response.survey) st.response.survey = def.qs.map(()=>null);
+    const ui = surveyInitUI(stageKey, def, st.response.survey);
+    progressPct = ui.done ? 100 : Math.round(((ui.idx+1)/def.qs.length)*100);
+  }
+  return `<div class="sv-shell">
+    <div class="sv-toprogress"><i style="width:${progressPct}%"></i></div>
+    <div class="sv-topbar">
+      <span class="sv-exit-link" onclick="PKG.progress.currentScreen='brief';render();">← Brief</span>
+      <span class="brand">Flat ⇄ Form</span>
+    </div>
+    <div class="sv-body">
+      ${hasSurvey?surveyFormHTML(stageKey):'<div class="card sv-card sv-complete"><p class="faint">No survey is part of this stage.</p></div>'}
+    </div>
+  </div>`;
+}
+
+// Always null now — completeStage() no longer sets it (see below), so the
+// "stage complete" interstitial screen it used to trigger never shows.
+// Left in place, unused, rather than torn out — same "hide, don't delete"
+// treatment as SURVEY_JUST_COMPLETED/renderSurveyCompleteScreen below.
+let STAGE_JUST_COMPLETED = null;
+// Marks a stage complete and stays right there showing it (checkmarks and
+// all) — it no longer jumps the viewed stage to whatever comes next or
+// shows a "continue" interstitial. Only the *availability* pointer
+// (progress.currentStage) advances, which is what unlocks the next stage's
+// row in the left rail; the participant chooses when to click into it.
+async function completeStage(stageKey){
+  const st=PKG.stages[stageKey];
+  if(!st.assigned){ if(!confirm('This stage has no garment assigned yet — mark it complete anyway?')) return; }
+  if(!st.response) st.response=emptyResponse();
+  if(!st.response.submittedAt) st.response.submittedAt = new Date().toISOString();
+  st.completed=true; st.completedAt=new Date().toISOString();
+  if(!PKG.progress.completedStages.includes(stageKey)) PKG.progress.completedStages.push(stageKey);
+  const next=getNextAssignedStage(PKG);
+  if(next){
+    PKG.progress.currentStage=next;
+    if(!(PKG.lifecycleLog||[]).some(e=>e && e.type==='stage_entered' && e.stage===next)){
+      logLifecycle('stage_entered', next);
+    }
+  }
+  else { endCurrentSession('completed'); }
+  PKG.progress.currentScreen='brief';
+  VIEW_STAGE=stageKey;
+  render();
+  // Deliberately no saveProgress() here — same reasoning as
+  // PanelStudio.onComplete above: this can fire outside a real user
+  // gesture (from surveyFinish()), where showSaveFilePicker() always
+  // throws and falls back to forcing a real file download.
+}
+// Final, deliberate export shown once every assigned stage is complete —
+// distinct from the ongoing checkpoint saves throughout the workshop.
+// Downloads the same package (same "-Solution" filename convention) through
+// the existing saveProgress() mechanism, then locks the application via
+// PKG.progress.workshopFinalized — but only once saveProgress() confirms a
+// real write/download happened, never on a cancelled dialog or read failure
+// (that would strand the participant with a locked app and no file).
+async function exportFinalPackage(){
+  if(!PKG) return;
+  if(!confirm('This exports your final workshop file and locks this application — no further changes will be possible afterwards. Continue?')) return;
+  PKG.progress.workshopFinalized = true;
+  PKG.progress.finalizedAt = new Date().toISOString();
+  const ok = await saveProgress();
+  if(!ok){
+    PKG.progress.workshopFinalized = false;
+    PKG.progress.finalizedAt = null;
+    toast('Export was cancelled — nothing was locked. Try again when ready.');
+    render();
+    return;
+  }
+  render();
+}
+// Priority 5 — if the participant dismissed/cancelled the save dialog that
+// exportFinalPackage() triggered (or just wants a second copy), this lets
+// them get the exact same finalized file again without re-running the
+// export flow. Deliberately a plain forced download, not saveProgress()'s
+// File System Access API path — that path can silently reuse an existing
+// file handle with no visible dialog at all, which would be a confusing
+// "nothing happened" experience for a button whose whole point is "give me
+// the file again." Reads PKG as it already exists in memory — finalized
+// content never changes after exportFinalPackage() ran, so this reproduces
+// byte-for-byte the same package under byte-for-byte the same filename;
+// nothing is regenerated.
+async function redownloadFinalPackage(){
+  if(!PKG) return;
+  let json;
+  try{ json = JSON.stringify(PKG, null, 2); }
+  catch(e){ alert('Could not prepare the file: '+e.message); return; }
+  const name = currentPkgFileName || 'workshop-package.json';
+  const blob = new Blob([json], {type:'application/json'});
+  try{
+    const dataUrl = await new Promise((res,rej)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>res(reader.result);
+      reader.onerror = ()=>rej(reader.error||new Error('File could not be read'));
+      reader.readAsDataURL(blob);
+    });
+    const a=document.createElement('a'); a.href=dataUrl; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Downloaded "'+name+'" again');
+  }catch(err){
+    alert('Could not download (file read failed).');
+  }
+}
+// The filename is deliberately not shown by default — it's an internal
+// naming convention (participant id, stages, timestamp, export id), not
+// something a participant needs to see or act on. One clear action
+// (download) instead. Kept available, but tucked behind a collapsed
+// "Show technical details" section, for the rare case someone needs it
+// (e.g. to confirm which file they're looking at when troubleshooting).
+function renderWorkshopFinalized(){
+  return `<div class="land-hero screen">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Workshop complete</h1>
+    <p class="sub">Thank you for taking part. Please send the downloaded file to your researcher, along with any other files they asked for, if you haven't already.</p>
+    <div class="land-card" style="text-align:center">
+      <div class="ico" style="font-size:40px;margin-bottom:16px">🔒</div>
+      <button class="btn blue" onclick="redownloadFinalPackage()">⬇ Download Workshop File</button>
+      <details style="margin-top:16px;text-align:left">
+        <summary class="faint" style="font-size:11px;cursor:pointer">Show technical details</summary>
+        <p class="faint mono" style="font-size:11px;margin-top:6px">Filename: ${esc(currentPkgFileName||'')}</p>
+      </details>
+    </div>
+  </div>`;
+}
+function continueFromCompletion(){
+  STAGE_JUST_COMPLETED = null;
+  render();
+}
+function renderStageCompleteScreen(stageKey, nextKey){
+  const name = esc(STAGE_NAME[stageKey].split(' · ')[0]);
+  return `<div class="land-hero screen">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>${name} complete</h1>
+    <p class="sub">${nextKey
+      ? `Nice work. Your next activity is <b>${esc(STAGE_NAME[nextKey].split(' · ')[0])}</b>.`
+      : `You've completed every activity assigned to you. Thank you for taking part in the workshop.`}</p>
+    <div class="land-card" style="text-align:center">
+      <div class="ico" style="font-size:40px;margin-bottom:16px">✓</div>
+      ${nextKey
+        ? `<button class="btn blue block" onclick="continueFromCompletion()">Continue to ${esc(STAGE_NAME[nextKey].split(' · ')[0])} →</button>`
+        : `<button class="btn blue block" onclick="continueFromCompletion()">← Back to Task Flow</button>`}
+    </div>
+  </div>`;
+}
+
+// Transient — set when the participant finishes the last survey question.
+// Distinct from STAGE_JUST_COMPLETED: finishing the survey does not, by
+// itself, mark the whole stage complete (that's now a deliberate action on
+// Brief) — it just returns navigation there. Never persisted, same
+// reasoning as STAGE_JUST_COMPLETED above.
+let SURVEY_JUST_COMPLETED = null;
+function continueFromSurveyCompletion(){
+  SURVEY_JUST_COMPLETED = null;
+  PKG.progress.currentScreen = 'brief';
+  render();
+}
+function renderSurveyCompleteScreen(stageKey){
+  return `<div class="land-hero screen">
+    <div class="brand">Flat ⇄ Form</div>
+    <h1>Survey complete</h1>
+    <p class="sub">Thanks — your responses for <b>${esc(STAGE_NAME[stageKey].split(' · ')[0])}</b> have been recorded.</p>
+    <div class="land-card" style="text-align:center">
+      <div class="ico" style="font-size:40px;margin-bottom:16px">✓</div>
+      <button class="btn blue block" onclick="continueFromSurveyCompletion()">← Back to Task Flow</button>
+    </div>
+  </div>`;
+}
+
+render();
+</script>
+</body>
+</html>
